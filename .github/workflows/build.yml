@@ -1,0 +1,80 @@
+name: Build ESP-Hosted Firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  ESP_IDF_VERSION: v5.5.1
+  ESP_HOSTED_VERSION: "2.7.0"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - esp32
+          - esp32c2
+          - esp32c3
+          - esp32c5
+          - esp32c6
+          - esp32c61
+          - esp32s2
+          - esp32s3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup ESP-IDF
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ env.ESP_IDF_VERSION }}
+          target: ${{ matrix.target }}
+
+      - name: Create project from esp_hosted slave example
+        run: |
+          idf.py create-project-from-example "espressif/esp_hosted^${{ env.ESP_HOSTED_VERSION }}:slave"
+
+      - name: Build firmware
+        working-directory: slave
+        run: |
+          idf.py set-target ${{ matrix.target }}
+          idf.py build
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp slave/build/network_adapter.bin artifacts/network_adapter_${{ matrix.target }}.bin
+          sha256sum artifacts/network_adapter_${{ matrix.target }}.bin > artifacts/network_adapter_${{ matrix.target }}.bin.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.target }}
+          path: artifacts/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: firmware
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: firmware/*
+          generate_release_notes: true
