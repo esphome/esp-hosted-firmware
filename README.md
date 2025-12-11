@@ -4,16 +4,14 @@ Pre-built [ESP-Hosted](https://github.com/espressif/esp-hosted) co-processor fir
 
 ## Supported Targets
 
-| Target | Status |
-|--------|--------|
-| ESP32 | Built |
-| ESP32-C2 | Built |
-| ESP32-C3 | Built |
-| ESP32-C5 | Built |
-| ESP32-C6 | Built |
-| ESP32-C61 | Built |
-| ESP32-S2 | Built |
-| ESP32-S3 | Built |
+Only targets supporting SDIO transport are built:
+
+| Target | SDIO | Status |
+|--------|:----:|--------|
+| ESP32 | Yes | Built |
+| ESP32-C5 | Yes | Built |
+| ESP32-C6 | Yes | Built |
+| ESP32-C61 | Yes | Built |
 
 ## Usage
 
