@@ -37,7 +37,7 @@ jobs:
       - name: Create project from esp_hosted slave example
         run: |
           . $IDF_PATH/export.sh
-          idf.py create-project-from-example "espressif/esp_hosted^${{ env.ESP_HOSTED_VERSION }}:slave"
+          idf.py create-project-from-example "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:slave"
 
       - name: Build firmware
         working-directory: slave
