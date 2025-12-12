@@ -52,9 +52,9 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          mkdir -p artifacts/${{ env.ESP_HOSTED_VERSION }}
-          cp slave/build/network_adapter.bin artifacts/${{ env.ESP_HOSTED_VERSION }}/network_adapter_${{ matrix.target }}.bin
-          sha256sum artifacts/${{ env.ESP_HOSTED_VERSION }}/network_adapter_${{ matrix.target }}.bin > artifacts/${{ env.ESP_HOSTED_VERSION }}/network_adapter_${{ matrix.target }}.bin.sha256
+          mkdir -p artifacts
+          cp slave/build/network_adapter.bin artifacts/network_adapter_${{ matrix.target }}.bin
+          sha256sum artifacts/network_adapter_${{ matrix.target }}.bin > artifacts/network_adapter_${{ matrix.target }}.bin.sha256
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -80,7 +80,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.ESP_HOSTED_VERSION }}
-          files: firmware/**/*
+          files: firmware/*
           generate_release_notes: true
 
   manifest:
@@ -111,14 +111,19 @@ jobs:
           echo '{"versions":[]}' > manifest.json
 
           for TAG in $TAGS; do
+            # Skip manifest tag
+            if [ "$TAG" = "manifest" ]; then
+              continue
+            fi
+
             VERSION="${TAG#v}"
 
             # Get SHA256 from release asset
-            SHA256_URL="https://github.com/${REPO}/releases/download/${TAG}/${VERSION}/network_adapter_${TARGET}.bin.sha256"
+            SHA256_URL="https://github.com/${REPO}/releases/download/${TAG}/network_adapter_${TARGET}.bin.sha256"
             SHA256=$(curl -sL "$SHA256_URL" 2>/dev/null | awk '{print $1}')
 
-            if [ -n "$SHA256" ] && [ "$SHA256" != "404:" ]; then
-              BIN_URL="https://github.com/${REPO}/releases/download/${TAG}/${VERSION}/network_adapter_${TARGET}.bin"
+            if [ -n "$SHA256" ] && [ ${#SHA256} -eq 64 ]; then
+              BIN_URL="https://github.com/${REPO}/releases/download/${TAG}/network_adapter_${TARGET}.bin"
 
               # Add to manifest using jq
               jq --arg ver "$VERSION" --arg url "$BIN_URL" --arg sha "$SHA256" \
@@ -135,7 +140,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "v${{ env.ESP_HOSTED_VERSION }}" \
+          # Create manifest release if it doesn't exist
+          gh release view manifest --repo "${{ github.repository }}" >/dev/null 2>&1 || \
+            gh release create manifest --repo "${{ github.repository }}" --title "Firmware Manifests" --notes "JSON manifests listing all firmware versions for each target."
+
+          gh release upload manifest \
             --repo "${{ github.repository }}" \
             --clobber \
             ${{ matrix.target }}.json
