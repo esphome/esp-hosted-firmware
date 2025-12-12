@@ -14,7 +14,7 @@ on:
 
 env:
   ESP_IDF_VERSION: v5.5.1
-  ESP_HOSTED_VERSION: "2.7.0"
+  ESP_HOSTED_VERSION: "2.7.1"
 
 jobs:
   build:
