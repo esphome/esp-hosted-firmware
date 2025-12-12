@@ -1,0 +1,34 @@
+name: Check for ESP-Hosted Updates
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest ESP-Hosted version
+        id: latest
+        run: |
+          VERSION=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" | jq -r '.versions[0].version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest ESP-Hosted version: $VERSION"
+
+      - name: Get latest release version
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(gh release view --repo ${{ github.repository }} --json tagName -q '.tagName' 2>/dev/null | sed 's/^v//' || echo "none")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current release version: $VERSION"
+
+      - name: Trigger build if new version
+        if: steps.latest.outputs.version != steps.current.outputs.version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "New version available: ${{ steps.latest.outputs.version }}"
+          gh workflow run build.yml --repo ${{ github.repository }} -f version=${{ steps.latest.outputs.version }} -f release=true
