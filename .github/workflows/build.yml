@@ -82,3 +82,58 @@ jobs:
           tag_name: v${{ env.ESP_HOSTED_VERSION }}
           files: firmware/**/*
           generate_release_notes: true
+
+  manifest:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        target:
+          - esp32
+          - esp32c5
+          - esp32c6
+          - esp32c61
+
+    steps:
+      - name: Generate manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TARGET="${{ matrix.target }}"
+          REPO="${{ github.repository }}"
+
+          # Get all release tags
+          TAGS=$(gh release list --repo "$REPO" --json tagName -q '.[].tagName')
+
+          # Build manifest using jq
+          echo '{"versions":[]}' > manifest.json
+
+          for TAG in $TAGS; do
+            VERSION="${TAG#v}"
+
+            # Get SHA256 from release asset
+            SHA256_URL="https://github.com/${REPO}/releases/download/${TAG}/${VERSION}/network_adapter_${TARGET}.bin.sha256"
+            SHA256=$(curl -sL "$SHA256_URL" 2>/dev/null | awk '{print $1}')
+
+            if [ -n "$SHA256" ] && [ "$SHA256" != "404:" ]; then
+              BIN_URL="https://github.com/${REPO}/releases/download/${TAG}/${VERSION}/network_adapter_${TARGET}.bin"
+
+              # Add to manifest using jq
+              jq --arg ver "$VERSION" --arg url "$BIN_URL" --arg sha "$SHA256" \
+                '.versions += [{"version": $ver, "url": $url, "sha256": $sha}]' \
+                manifest.json > tmp.json && mv tmp.json manifest.json
+            fi
+          done
+
+          mv manifest.json ${TARGET}.json
+
+      - name: Upload manifest to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "v${{ env.ESP_HOSTED_VERSION }}" \
+            --repo "${{ github.repository }}" \
+            --clobber \
+            ${{ matrix.target }}.json
