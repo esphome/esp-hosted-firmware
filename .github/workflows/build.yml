@@ -127,7 +127,9 @@ jobs:
             fi
           done
 
-          mv manifest.json ${TARGET}.json
+          # Sort versions descending (newest first)
+          jq '.versions |= sort_by(.version | split(".") | map(tonumber)) | .versions |= reverse' \
+            manifest.json > ${TARGET}.json
 
       - name: Upload manifest to release
         env:
