@@ -40,7 +40,7 @@ source export.sh
 cd ..
 
 # Create project from ESP-Hosted example
-idf.py create-project-from-example "espressif/esp_hosted^2.7.0:slave"
+idf.py create-project-from-example "espressif/esp_hosted==2.7.0:slave"
 cd slave/
 
 # Build for your target
