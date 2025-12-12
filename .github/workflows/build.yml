@@ -117,18 +117,21 @@ jobs:
             fi
 
             VERSION="${TAG#v}"
+            SHA256_FILE="network_adapter_${TARGET}.bin.sha256"
 
-            # Get SHA256 from release asset
-            SHA256_URL="https://github.com/${REPO}/releases/download/${TAG}/network_adapter_${TARGET}.bin.sha256"
-            SHA256=$(curl -sL "$SHA256_URL" 2>/dev/null | awk '{print $1}')
+            # Download SHA256 file using gh CLI (handles auth properly)
+            if gh release download "$TAG" --repo "$REPO" --pattern "$SHA256_FILE" --clobber 2>/dev/null; then
+              SHA256=$(awk '{print $1}' "$SHA256_FILE")
+              rm -f "$SHA256_FILE"
 
-            if [ -n "$SHA256" ] && [ ${#SHA256} -eq 64 ]; then
-              BIN_URL="https://github.com/${REPO}/releases/download/${TAG}/network_adapter_${TARGET}.bin"
+              if [ -n "$SHA256" ] && [ ${#SHA256} -eq 64 ]; then
+                BIN_URL="https://github.com/${REPO}/releases/download/${TAG}/network_adapter_${TARGET}.bin"
 
-              # Add to manifest using jq
-              jq --arg ver "$VERSION" --arg url "$BIN_URL" --arg sha "$SHA256" \
-                '.versions += [{"version": $ver, "url": $url, "sha256": $sha}]' \
-                manifest.json > tmp.json && mv tmp.json manifest.json
+                # Add to manifest using jq
+                jq --arg ver "$VERSION" --arg url "$BIN_URL" --arg sha "$SHA256" \
+                  '.versions += [{"version": $ver, "url": $url, "sha256": $sha}]' \
+                  manifest.json > tmp.json && mv tmp.json manifest.json
+              fi
             fi
           done
 
