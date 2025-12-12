@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Create a release'
+        type: boolean
+        default: true
 
 env:
   ESP_IDF_VERSION: v5.5.1
@@ -43,9 +48,9 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          mkdir -p artifacts
-          cp slave/build/network_adapter.bin artifacts/network_adapter_${{ matrix.target }}.bin
-          sha256sum artifacts/network_adapter_${{ matrix.target }}.bin > artifacts/network_adapter_${{ matrix.target }}.bin.sha256
+          mkdir -p artifacts/${{ env.ESP_HOSTED_VERSION }}
+          cp slave/build/network_adapter.bin artifacts/${{ env.ESP_HOSTED_VERSION }}/network_adapter_${{ matrix.target }}.bin
+          sha256sum artifacts/${{ env.ESP_HOSTED_VERSION }}/network_adapter_${{ matrix.target }}.bin > artifacts/${{ env.ESP_HOSTED_VERSION }}/network_adapter_${{ matrix.target }}.bin.sha256
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -56,7 +61,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release
     permissions:
       contents: write
 
@@ -70,5 +75,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: firmware/*
+          tag_name: v${{ env.ESP_HOSTED_VERSION }}
+          files: firmware/**/*
           generate_release_notes: true
