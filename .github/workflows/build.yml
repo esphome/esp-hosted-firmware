@@ -17,7 +17,7 @@ on:
         default: true
 
 env:
-  ESP_IDF_VERSION: v5.5.1
+  ESP_IDF_VERSION: v5.5.2
   ESP_HOSTED_VERSION: ${{ inputs.version || '2.7.0' }}
 
 jobs:
