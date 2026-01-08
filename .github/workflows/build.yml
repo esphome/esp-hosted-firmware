@@ -103,6 +103,9 @@ jobs:
         run: |
           TARGET="${{ matrix.target }}"
           REPO="${{ github.repository }}"
+          REPO_OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+          BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
 
           # Get all release tags
           TAGS=$(gh release list --repo "$REPO" --json tagName -q '.[].tagName')
@@ -125,7 +128,7 @@ jobs:
               rm -f "$SHA256_FILE"
 
               if [ -n "$SHA256" ] && [ ${#SHA256} -eq 64 ]; then
-                BIN_URL="https://github.com/${REPO}/releases/download/${TAG}/network_adapter_${TARGET}.bin"
+                BIN_URL="${BASE_URL}/${TAG}/network_adapter_${TARGET}.bin"
 
                 # Add to manifest using jq
                 jq --arg ver "$VERSION" --arg url "$BIN_URL" --arg sha "$SHA256" \
