@@ -151,3 +151,127 @@ jobs:
             --repo "${{ github.repository }}" \
             --clobber \
             ${{ matrix.target }}.json
+
+  deploy-pages:
+    needs: manifest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download all releases and manifests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p public/manifest
+
+          # Download manifests
+          gh release download manifest \
+            --repo "${{ github.repository }}" \
+            --pattern "*.json" \
+            --dir public/manifest || true
+
+          # Get all release tags (exclude manifest)
+          TAGS=$(gh release list --repo "${{ github.repository }}" --json tagName -q '.[].tagName' | grep -v '^manifest$')
+
+          for TAG in $TAGS; do
+            echo "Downloading $TAG..."
+            mkdir -p "public/$TAG"
+            gh release download "$TAG" \
+              --repo "${{ github.repository }}" \
+              --pattern "*.bin" \
+              --dir "public/$TAG" || true
+          done
+
+      - name: Create index.html
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
+
+          cat > public/index.html << 'HEADER'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>ESP-Hosted Firmware</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; max-width: 900px; }
+              h1 { color: #333; }
+              h2 { color: #555; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+              h3 { color: #666; margin-top: 20px; }
+              ul { list-style-type: none; padding: 0; }
+              li { margin: 8px 0; }
+              a { color: #0366d6; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+              code { font-family: monospace; font-size: 0.85em; background: #f6f8fa; padding: 2px 6px; border-radius: 3px; }
+              .latest { background: #28a745; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-left: 10px; }
+              .manifest-section { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 30px; }
+            </style>
+          </head>
+          <body>
+            <h1>ESP-Hosted Firmware</h1>
+            <p>Pre-built ESP-Hosted firmware binaries for ESPHome.</p>
+
+            <div class="manifest-section">
+              <h3>Manifests (JSON)</h3>
+              <p>Machine-readable manifests with all versions, URLs, and SHA256 checksums:</p>
+              <ul>
+          HEADER
+
+          for manifest in public/manifest/*.json; do
+            if [ -f "$manifest" ]; then
+              filename=$(basename "$manifest")
+              target="${filename%.json}"
+              echo "        <li><a href=\"manifest/${filename}\">${target}</a> - <code>${BASE_URL}/manifest/${filename}</code></li>" >> public/index.html
+            fi
+          done
+
+          cat >> public/index.html << 'MIDDLE'
+              </ul>
+            </div>
+
+            <h2>Releases</h2>
+          MIDDLE
+
+          FIRST=true
+          for dir in $(ls -d public/v* 2>/dev/null | sort -V -r); do
+            TAG=$(basename "$dir")
+            echo "    <h3>$TAG" >> public/index.html
+            if [ "$FIRST" = true ]; then
+              echo '<span class="latest">Latest</span>' >> public/index.html
+              FIRST=false
+            fi
+            echo "</h3>" >> public/index.html
+            echo "    <ul>" >> public/index.html
+
+            for file in "$dir"/*.bin; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                echo "      <li><a href=\"${TAG}/${filename}\">${filename}</a> - <code>${BASE_URL}/${TAG}/${filename}</code></li>" >> public/index.html
+              fi
+            done
+
+            echo "    </ul>" >> public/index.html
+          done
+
+          cat >> public/index.html << 'FOOTER'
+          </body>
+          </html>
+          FOOTER
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
