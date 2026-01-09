@@ -15,7 +15,7 @@ Only targets supporting SDIO transport are built:
 
 ## Usage
 
-1. Download the appropriate firmware binary for your co-processor from the [Releases](https://github.com/esphome/esp-hosted-firmware/releases) page
+1. Download the appropriate firmware binary for your co-processor from the [GitHub Page](https://esphome.github.io/esp-hosted-firmware/).
 2. Place the `.bin` file in your ESPHome configuration directory
 3. Configure the update component in your ESPHome YAML:
 
