@@ -157,12 +157,6 @@ jobs:
 
   deploy-pages:
     needs: manifest
-    # Always run on main branch pushes (even if manifest was skipped due to no release)
-    # This ensures GitHub Pages stays deployed when non-release changes are made
-    if: |
-      always() &&
-      !cancelled() &&
-      github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
