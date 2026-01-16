@@ -56,15 +56,15 @@ To build firmware locally, you'll need to set up the ESP-IDF environment:
 
 ```sh
 # Clone and setup ESP-IDF
-git clone -b v5.5.1 --recursive https://github.com/espressif/esp-idf.git
+git clone -b v5.5.2 --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
 ./install.sh esp32c6  # or your target
 source export.sh      # for Linux/macOS
-# export.bat          # for Windows
+export.bat            # for Windows
 cd ..
 
 # Create project from ESP-Hosted example
-idf.py create-project-from-example "espressif/esp_hosted==2.7.0:slave"
+idf.py create-project-from-example "espressif/esp_hosted==2.9.3:slave"
 cd slave/
 
 # Build for your target
