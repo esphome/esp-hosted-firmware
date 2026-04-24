@@ -28,7 +28,8 @@ jobs:
           RELEASED=$(gh release list --repo "${{ github.repository }}" --limit 200 \
             --json tagName -q '.[].tagName' \
             | grep -v '^manifest$' \
-            | sed 's/^v//')
+            | sed 's/^v//' \
+            | sort -V)
 
           # Highest version we've already released. If there are no releases,
           # bail out — this workflow only builds forward, not historical gaps.
