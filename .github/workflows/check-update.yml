@@ -25,8 +25,26 @@ jobs:
             | grep -v '^manifest$' \
             | sed 's/^v//')
 
-          # Versions available but not yet released, sorted oldest-first
-          MISSING=$(grep -Fxv -f <(echo "$RELEASED") <<< "$AVAILABLE" | sort -V || true)
+          # Highest version we've already released. If there are no releases,
+          # bail out — this workflow only builds forward, not historical gaps.
+          HIGHEST=$(echo "$RELEASED" | sort -V | tail -n1)
+          if [ -z "$HIGHEST" ]; then
+            echo "No existing releases; nothing to do (bootstrap a release manually)."
+            MISSING=""
+          else
+            # Missing = stable versions strictly newer than HIGHEST
+            MISSING=$(echo "$AVAILABLE" | sort -V | awk -v h="$HIGHEST" '
+              function ver_gt(a, b,   as, bs, i, an, bn) {
+                n = split(a, as, "."); split(b, bs, ".")
+                for (i = 1; i <= n; i++) {
+                  an = as[i] + 0; bn = bs[i] + 0
+                  if (an > bn) return 1
+                  if (an < bn) return 0
+                }
+                return 0
+              }
+              ver_gt($0, h)')
+          fi
 
           echo "Available stable versions:"
           echo "$AVAILABLE"
