@@ -92,7 +92,7 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: release-publish
+      group: release-publish-${{ matrix.target }}
       cancel-in-progress: false
     strategy:
       matrix:

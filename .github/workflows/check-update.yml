@@ -5,6 +5,10 @@ on:
     - cron: '0 6 * * *'  # Daily at 6 AM UTC
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -14,10 +18,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Stable versions from the ESP component registry (exclude pre-releases)
+          # Stable versions from the ESP component registry (exclude any semver
+          # pre-release, i.e. anything with a '-' identifier like 3.0.0-rc1).
           AVAILABLE=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" \
-            | jq -r '.versions[].version' \
-            | grep -viE 'rc|alpha|beta|dev')
+            | jq -r '.versions[].version | select(contains("-") | not)' \
+            | sort -Vu)
 
           # Versions already released (strip leading v, skip manifest tag)
           RELEASED=$(gh release list --repo "${{ github.repository }}" --limit 200 \
@@ -33,7 +38,7 @@ jobs:
             MISSING=""
           else
             # Missing = stable versions strictly newer than HIGHEST
-            MISSING=$(echo "$AVAILABLE" | sort -V | awk -v h="$HIGHEST" '
+            MISSING=$(echo "$AVAILABLE" | awk -v h="$HIGHEST" '
               function ver_gt(a, b,   as, bs, i, an, bn) {
                 n = split(a, as, "."); split(b, bs, ".")
                 for (i = 1; i <= n; i++) {
@@ -46,21 +51,25 @@ jobs:
               ver_gt($0, h)')
           fi
 
+          # Count non-empty lines
+          COUNT=$(printf '%s\n' "$MISSING" | grep -cve '^$' || true)
+
           echo "Available stable versions:"
           echo "$AVAILABLE"
           echo "Already released:"
           echo "$RELEASED"
-          echo "Missing versions to build:"
+          echo "Missing versions to build ($COUNT):"
           echo "$MISSING"
 
           {
+            echo "count=$COUNT"
             echo "missing<<EOF"
             echo "$MISSING"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
       - name: Dispatch build for each missing version
-        if: steps.todo.outputs.missing != ''
+        if: steps.todo.outputs.count != '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
