@@ -9,26 +9,49 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Get latest ESP-Hosted version
-        id: latest
-        run: |
-          VERSION=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" | jq -r '.versions[0].version')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Latest ESP-Hosted version: $VERSION"
-
-      - name: Get latest release version
-        id: current
+      - name: Determine versions to build
+        id: todo
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(gh release view --repo ${{ github.repository }} --json tagName -q '.tagName' 2>/dev/null | sed 's/^v//' || echo "none")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Current release version: $VERSION"
+          # Stable versions from the ESP component registry (exclude pre-releases)
+          AVAILABLE=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" \
+            | jq -r '.versions[].version' \
+            | grep -viE 'rc|alpha|beta|dev' \
+            | sort -V)
 
-      - name: Trigger build if new version
-        if: steps.latest.outputs.version != steps.current.outputs.version
+          # Versions already released (strip leading v, skip manifest tag)
+          RELEASED=$(gh release list --repo "${{ github.repository }}" --limit 200 \
+            --json tagName -q '.[].tagName' \
+            | grep -v '^manifest$' \
+            | sed 's/^v//' \
+            | sort -V)
+
+          # Versions available but not yet released
+          MISSING=$(comm -23 <(echo "$AVAILABLE") <(echo "$RELEASED"))
+
+          echo "Available stable versions:"
+          echo "$AVAILABLE"
+          echo "Already released:"
+          echo "$RELEASED"
+          echo "Missing versions to build:"
+          echo "$MISSING"
+
+          {
+            echo "missing<<EOF"
+            echo "$MISSING"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch build for each missing version
+        if: steps.todo.outputs.missing != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "New version available: ${{ steps.latest.outputs.version }}"
-          gh workflow run build.yml --repo ${{ github.repository }} -f version=${{ steps.latest.outputs.version }} -f release=true
+          while IFS= read -r V; do
+            [ -z "$V" ] && continue
+            echo "Dispatching build for $V"
+            gh workflow run build.yml --repo "${{ github.repository }}" \
+              -f version="$V" -f release=true
+            sleep 5
+          done <<< "${{ steps.todo.outputs.missing }}"
