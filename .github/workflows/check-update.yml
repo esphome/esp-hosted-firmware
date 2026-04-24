@@ -17,18 +17,16 @@ jobs:
           # Stable versions from the ESP component registry (exclude pre-releases)
           AVAILABLE=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" \
             | jq -r '.versions[].version' \
-            | grep -viE 'rc|alpha|beta|dev' \
-            | sort -V)
+            | grep -viE 'rc|alpha|beta|dev')
 
           # Versions already released (strip leading v, skip manifest tag)
           RELEASED=$(gh release list --repo "${{ github.repository }}" --limit 200 \
             --json tagName -q '.[].tagName' \
             | grep -v '^manifest$' \
-            | sed 's/^v//' \
-            | sort -V)
+            | sed 's/^v//')
 
-          # Versions available but not yet released
-          MISSING=$(comm -23 <(echo "$AVAILABLE") <(echo "$RELEASED"))
+          # Versions available but not yet released, sorted oldest-first
+          MISSING=$(grep -Fxv -f <(echo "$RELEASED") <<< "$AVAILABLE" | sort -V || true)
 
           echo "Available stable versions:"
           echo "$AVAILABLE"
