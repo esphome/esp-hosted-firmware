@@ -43,6 +43,14 @@ jobs:
           . $IDF_PATH/export.sh
           idf.py create-project-from-example "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:slave"
 
+      - name: Apply ESP-NOW overlay
+        # Injects the ESP-NOW-over-CustomRpc slave overlay (slave-overlay/) into
+        # the scaffolded project so the firmware also carries ESP-NOW, which
+        # upstream esp-hosted does not yet proxy (espressif/esp-hosted-mcu#19).
+        # Self-skips on esp_hosted < 2.8.1 (no CustomRpc), leaving those builds
+        # identical to the stock slave.
+        run: ./apply-overlay.sh slave
+
       - name: Build firmware
         working-directory: slave
         run: |

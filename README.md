@@ -4,6 +4,14 @@ Pre-built [ESP-Hosted](https://github.com/espressif/esp-hosted) co-processor fir
 
 For full documentation, see the [ESP32 Hosted Update](https://esphome.io/components/update/esp32_hosted/) page.
 
+## ESP-NOW support
+
+These binaries are the stock ESP-Hosted slave **plus a small overlay that adds ESP-NOW to the host↔co-processor link**. Upstream ESP-Hosted proxies `esp_wifi.h` but not `esp_now.h` (Espressif tracking issue [esp-hosted-mcu#19](https://github.com/espressif/esp-hosted-mcu/issues/19)), so a radio-less host such as the ESP32-P4 cannot use ESP-NOW through the co-processor out of the box. The overlay bridges the native `esp_now_*` API over ESP-Hosted's CustomRpc channel, letting ESPHome's `espnow` component run unmodified on a hosted host. It was validated on real hardware (ESP32-P4 + ESP32-C6) on 2026-07-20.
+
+The overlay lives in [`slave-overlay/`](slave-overlay/) and is injected into each CI build by [`apply-overlay.sh`](apply-overlay.sh). It only applies to ESP-Hosted **≥ 2.8.1** (when the CustomRpc "peer data transfer" channel was added); older versions build as the unmodified stock slave.
+
+> **Wire-protocol coupling.** `slave-overlay/esp_now_hosted_rpc.h` is the on-the-wire contract and must stay byte-identical to the copy the ESPHome host shim (the `esp_now_hosted` half of the `esp32_hosted` component) uses. If the protocol changes, update **both** copies together.
+
 ## Supported Targets
 
 Only targets supporting SDIO transport are built:
@@ -65,6 +73,10 @@ cd ..
 
 # Create project from ESP-Hosted example
 idf.py create-project-from-example "espressif/esp_hosted==2.9.3:slave"
+
+# Inject the ESP-NOW overlay (no-op on ESP-Hosted < 2.8.1)
+./apply-overlay.sh slave
+
 cd slave/
 
 # Build for your target
@@ -73,6 +85,8 @@ idf.py build
 
 # Output: build/network_adapter.bin
 ```
+
+To build the *stock* slave without ESP-NOW, simply skip the `apply-overlay.sh` step.
 
 After building, copy the firmware to your ESPHome configuration directory:
 
