@@ -16,18 +16,15 @@ on:
         type: boolean
         default: true
 
-# esp_hosted 2.x links against IDF v5.5.4 (2.x's slave mempool_ll.c collides
-# with v5.5.5's bt os_mempool on esp32c5); 3.x requires v5.5.5 for the SDIO
-# send-cap fix its build guard checks for.
 env:
-  ESP_IDF_VERSION: ${{ startsWith(inputs.version || '3.0.5', '2.') && 'v5.5.4' || 'v5.5.5' }}
+  ESP_IDF_VERSION: v5.5.5
   ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.5' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:${{ startsWith(inputs.version || '3.0.5', '2.') && 'v5.5.4' || 'v5.5.5' }}
+      image: espressif/idf:v5.5.5
     strategy:
       fail-fast: false
       matrix:
