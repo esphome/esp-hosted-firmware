@@ -17,14 +17,14 @@ on:
         default: true
 
 env:
-  ESP_IDF_VERSION: v5.5.4
+  ESP_IDF_VERSION: v5.5.5
   ESP_HOSTED_VERSION: ${{ inputs.version || '2.7.0' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.5.4
+      image: espressif/idf:v5.5.5
     strategy:
       fail-fast: false
       matrix:
@@ -60,13 +60,6 @@ jobs:
         run: |
           . $IDF_PATH/export.sh
           idf.py create-project-from-example "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
-
-      # 3.x SDIO co-processor builds require the ESP-IDF SDIO send-cap fix;
-      # eh.py rewrites one guard line in sdio_slave.c of the container's IDF.
-      - name: Patch ESP-IDF SDIO send cap
-        if: steps.params.outputs.example != 'slave'
-        run: |
-          python3 ${{ steps.params.outputs.project }}/managed_components/espressif__esp_hosted/tools/eh.py patch-idf --idf-path $IDF_PATH
 
       - name: Build firmware
         working-directory: ${{ steps.params.outputs.project }}
