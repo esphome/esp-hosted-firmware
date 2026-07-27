@@ -38,13 +38,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Create project from esp_hosted slave example
+      # esp_hosted 2.x ships the co-processor firmware as the "slave" example
+      # (binary: network_adapter.bin). 3.x restructured the examples tree; the
+      # equivalent Wi-Fi + BT (VHCI) co-processor firmware is the
+      # bluetooth/cp/wifi_hosted_hci profile.
+      - name: Determine build parameters
+        id: params
+        run: |
+          MAJOR="${ESP_HOSTED_VERSION%%.*}"
+          if [ "$MAJOR" -ge 3 ]; then
+            echo "example=bluetooth/cp/wifi_hosted_hci" >> "$GITHUB_OUTPUT"
+            echo "project=wifi_hosted_hci" >> "$GITHUB_OUTPUT"
+            echo "binary=eh_cp_bt_wifi_hosted_hci_mcu.bin" >> "$GITHUB_OUTPUT"
+          else
+            echo "example=slave" >> "$GITHUB_OUTPUT"
+            echo "project=slave" >> "$GITHUB_OUTPUT"
+            echo "binary=network_adapter.bin" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create project from esp_hosted co-processor example
         run: |
           . $IDF_PATH/export.sh
-          idf.py create-project-from-example "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:slave"
+          idf.py create-project-from-example "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
+
+      # 3.x SDIO co-processor builds require the ESP-IDF SDIO send-cap fix;
+      # eh.py rewrites one guard line in sdio_slave.c of the container's IDF.
+      - name: Patch ESP-IDF SDIO send cap
+        if: steps.params.outputs.example != 'slave'
+        run: |
+          python3 ${{ steps.params.outputs.project }}/managed_components/espressif__esp_hosted/tools/eh.py patch-idf --idf-path $IDF_PATH
 
       - name: Build firmware
-        working-directory: slave
+        working-directory: ${{ steps.params.outputs.project }}
         run: |
           . $IDF_PATH/export.sh
           idf.py set-target ${{ matrix.target }}
@@ -53,7 +78,7 @@ jobs:
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
-          cp slave/build/network_adapter.bin artifacts/network_adapter_${{ matrix.target }}.bin
+          cp ${{ steps.params.outputs.project }}/build/${{ steps.params.outputs.binary }} artifacts/network_adapter_${{ matrix.target }}.bin
           sha256sum artifacts/network_adapter_${{ matrix.target }}.bin > artifacts/network_adapter_${{ matrix.target }}.bin.sha256
 
       - name: Upload artifacts
