@@ -34,21 +34,23 @@ log() { echo "apply-overlay: $*"; }
 die() { echo "apply-overlay: ERROR: $*" >&2; exit 1; }
 
 [ -d "$OVERLAY_DIR" ]  || die "overlay dir not found: $OVERLAY_DIR"
-[ -d "$SLAVE_DIR" ]    || die "slave dir not found: $SLAVE_DIR (run create-project-from-example first)"
-[ -f "$CMAKE" ]        || die "not a scaffolded slave project: $CMAKE missing"
+[ -d "$SLAVE_DIR" ]    || die "project dir not found: $SLAVE_DIR (run create-project-from-example first)"
 
 # NOTE: slave-overlay/esp_now_hosted_rpc.h is the on-the-wire contract and must
 # stay byte-identical to the copy the ESPHome host shim (esp32_hosted component)
 # uses. If you revise the protocol, edit BOTH copies together.
 
-# ── Version gate ────────────────────────────────────────────────────────────
-# CustomRpc "peer data transfer" exists only since esp_hosted v2.8.1. On older
-# versions there is no header to include and no Kconfig block to hook, so skip
-# the overlay entirely and let the stock slave build unmodified.
-if ! grep -q "CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER" "$CMAKE" \
+# ── Layout / version gate ────────────────────────────────────────────────────
+# The overlay targets the esp_hosted 2.x "slave" example: a main/ component with
+# the CustomRpc "peer data transfer" channel (esp_hosted >= 2.8.1). Skip — never
+# fail — when the scaffolded project isn't that layout, so both esp_hosted < 2.8.1
+# (no CustomRpc) and the restructured 3.x co-processor example (a different
+# project entirely) build unmodified.
+if [ ! -f "$CMAKE" ] \
+   || ! grep -q "CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER" "$CMAKE" \
    || [ ! -f "$MAIN_DIR/esp_hosted_peer_data.h" ]; then
-  log "esp_hosted CustomRpc (peer data transfer) not present in this version;"
-  log "skipping ESP-NOW overlay — building the stock slave unmodified."
+  log "project $SLAVE_DIR is not the esp_hosted 2.x slave layout with CustomRpc;"
+  log "skipping ESP-NOW overlay — building the co-processor firmware unmodified."
   exit 0
 fi
 
