@@ -156,6 +156,15 @@ static void slave_req_cb(uint32_t msg_id, const uint8_t *data, size_t len, void 
         break;
       }
       const esp_now_hosted_send_req_t *s = (const esp_now_hosted_send_req_t *) pl;
+      /* data_len is host-supplied; bound it against the bytes actually received
+       * (pl_len minus the fixed header) and the protocol frame cap before
+       * handing the pointer to esp_now_send, which would otherwise read past
+       * the request buffer. */
+      const size_t avail = pl_len - sizeof(esp_now_hosted_send_req_t);
+      if (s->data_len > avail || s->data_len > ESP_NOW_HOSTED_MAX_FRAME) {
+        resp->status = ESP_ERR_INVALID_SIZE;
+        break;
+      }
       const uint8_t *addr = s->has_addr ? s->peer_addr : NULL;
       resp->status = esp_now_send(addr, s->data, s->data_len);
       break;
