@@ -10,7 +10,7 @@ on:
       version:
         description: 'ESP-Hosted version to build'
         type: string
-        default: '3.0.5'
+        default: '3.0.8'
       idf_version:
         description: 'ESP-IDF version (blank = the version ESPHome recommends)'
         type: string
@@ -23,7 +23,7 @@ on:
 permissions: {}
 
 env:
-  ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.5' }}
+  ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.8' }}
 
 jobs:
   # The co-processor is built with the same ESP-IDF release that ESPHome
