@@ -13,7 +13,7 @@ NAME = "ESP_IDF_FRAMEWORK_VERSION_LOOKUP"
 
 
 def main() -> None:
-    with urllib.request.urlopen(URL) as resp:
+    with urllib.request.urlopen(URL, timeout=30) as resp:
         tree = ast.parse(resp.read())
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):
