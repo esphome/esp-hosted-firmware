@@ -60,11 +60,14 @@ update:
 
 ## Building Custom Firmware
 
-To build firmware locally, you'll need to set up the ESP-IDF environment:
+To build firmware locally, you'll need to set up the ESP-IDF environment. CI
+builds with the ESP-IDF release that ESPHome recommends for the host (the
+`recommended` entry of `ESP_IDF_FRAMEWORK_VERSION_LOOKUP` in ESPHome's `esp32`
+component, v5.5.5 at the time of writing); use the same one:
 
 ```sh
 # Clone and setup ESP-IDF
-git clone -b v5.5.2 --recursive https://github.com/espressif/esp-idf.git
+git clone -b v5.5.5 --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
 ./install.sh esp32c6  # or your target
 source export.sh      # for Linux/macOS

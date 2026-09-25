@@ -11,6 +11,10 @@ on:
         description: 'ESP-Hosted version to build'
         type: string
         default: '3.0.5'
+      idf_version:
+        description: 'ESP-IDF version (blank = the version ESPHome recommends)'
+        type: string
+        default: ''
       release:
         description: 'Create a release'
         type: boolean
@@ -19,16 +23,46 @@ on:
 permissions: {}
 
 env:
-  ESP_IDF_VERSION: v5.5.5
   ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.5' }}
 
 jobs:
+  # The co-processor is built with the same ESP-IDF release that ESPHome
+  # recommends for the host, read from the esp32 component on the dev branch,
+  # so there is a single place to bump. workflow_dispatch can override it.
+  idf:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve ESP-IDF version
+        id: resolve
+        env:
+          OVERRIDE: ${{ inputs.idf_version }}
+        run: |
+          if [ -n "$OVERRIDE" ]; then
+            VERSION="$OVERRIDE"
+          else
+            VERSION=$(curl -fsSL https://raw.githubusercontent.com/esphome/esphome/dev/esphome/components/esp32/__init__.py \
+              | sed -n '/^ESP_IDF_FRAMEWORK_VERSION_LOOKUP = {/,/^}/p' \
+              | sed -n 's/.*"recommended": cv.Version(\([0-9]*\), \([0-9]*\), \([0-9]*\)).*/\1.\2.\3/p')
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "Could not resolve the ESP-IDF version" >&2
+            exit 1
+          fi
+          # Docker images and git tags are v6.1, not v6.1.0
+          VERSION="v${VERSION#v}"
+          VERSION="${VERSION%.0}"
+          echo "Using ESP-IDF $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: idf
     runs-on: ubuntu-latest
     permissions:
       contents: read
     container:
-      image: espressif/idf:v5.5.5
+      image: espressif/idf:${{ needs.idf.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
