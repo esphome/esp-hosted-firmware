@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
 # apply-overlay.sh — inject the ESP-NOW-over-CustomRpc slave overlay into a
-# freshly scaffolded esp_hosted `slave` project, so the prebuilt co-processor
-# firmware also carries ESP-NOW (which upstream esp-hosted does not yet proxy —
+# freshly scaffolded esp_hosted co-processor project (the 2.x `slave` example or
+# a 3.x `cp` project), so the prebuilt co-processor firmware also carries
+# ESP-NOW (which upstream esp-hosted does not yet proxy —
 # espressif/esp-hosted-mcu#19).
 #
-# It performs only safe *appends* against the scaffolded project:
+# On the 2.x layout it performs only safe *appends* against the scaffolded project:
 #   1. copies slave-overlay/{esp_now_hosted_slave.c,.h,esp_now_hosted_rpc.h}
 #      into slave/main/;
 #   2. registers esp_now_hosted_slave.c inside the existing
@@ -40,12 +41,56 @@ die() { echo "apply-overlay: ERROR: $*" >&2; exit 1; }
 # stay byte-identical to the copy the ESPHome host shim (esp32_hosted component)
 # uses. If you revise the protocol, edit BOTH copies together.
 
+# ── esp_hosted 3.x co-processor layout ───────────────────────────────────────
+# 3.x scaffolds a plain IDF project (main/main.c + a three-line
+# idf_component_register) on top of the esp_hosted component, and the CustomRpc
+# channel is the eh_cp_feat_peer_data feature. The overlay sources compile
+# against either API (see esp_now_hosted_slave.c), so here we only need to add
+# the source, the component requirements, the force-link and the feature
+# Kconfig. main/CMakeLists.txt is rewritten wholesale: it is tiny, and its
+# stock content is known.
+if [ -f "$CMAKE" ] && [ -f "$DEFAULTS" ] && grep -q "^CONFIG_ESP_HOSTED_CP=y" "$DEFAULTS"; then
+  cp "$OVERLAY_DIR/esp_now_hosted_slave.c" "$MAIN_DIR/"
+  cp "$OVERLAY_DIR/esp_now_hosted_slave.h" "$MAIN_DIR/"
+  cp "$OVERLAY_DIR/esp_now_hosted_rpc.h"   "$MAIN_DIR/"
+  log "copied overlay sources into $MAIN_DIR/ (esp_hosted 3.x layout)"
+
+  cat > "$CMAKE" <<CMAKE_EOF
+idf_component_register(
+    SRCS          "main.c" "esp_now_hosted_slave.c"
+    INCLUDE_DIRS  "."
+    REQUIRES      nvs_flash esp_hosted
+    PRIV_REQUIRES esp_wifi
+)
+
+# --- $MARKER ---
+# Pull the self-registering ESP-NOW overlay object into the link (nothing
+# references its symbols, so it would otherwise be garbage-collected).
+target_link_libraries(\${COMPONENT_LIB} INTERFACE "-u esp_now_hosted_slave_init")
+CMAKE_EOF
+  log "rewrote $CMAKE with the overlay source, requirements and force-link"
+
+  if grep -qF "$MARKER" "$DEFAULTS"; then
+    log "sdkconfig.defaults already carries the overlay options (idempotent no-op)"
+  else
+    {
+      echo ""
+      echo "# --- $MARKER ---"
+      echo "# esp-hosted CustomRpc (\"peer data transfer\") feature — carries ESP-NOW."
+      echo "CONFIG_ESP_HOSTED_CP_FEAT_PEER_DATA=y"
+    } >> "$DEFAULTS"
+    log "appended overlay options to $DEFAULTS"
+  fi
+
+  log "ESP-NOW overlay applied."
+  exit 0
+fi
+
 # ── Layout / version gate ────────────────────────────────────────────────────
 # The overlay targets the esp_hosted 2.x "slave" example: a main/ component with
 # the CustomRpc "peer data transfer" channel (esp_hosted >= 2.8.1). Skip — never
-# fail — when the scaffolded project isn't that layout, so both esp_hosted < 2.8.1
-# (no CustomRpc) and the restructured 3.x co-processor example (a different
-# project entirely) build unmodified.
+# fail — when the scaffolded project isn't that layout, so esp_hosted < 2.8.1
+# (no CustomRpc) builds unmodified.
 if [ ! -f "$CMAKE" ] \
    || ! grep -q "CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER" "$CMAKE" \
    || [ ! -f "$MAIN_DIR/esp_hosted_peer_data.h" ]; then

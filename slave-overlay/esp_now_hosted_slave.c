@@ -22,7 +22,17 @@
 #include "esp_now.h"   /* NATIVE ESP-NOW on the co-processor */
 #include "esp_wifi.h"
 
+/* esp_hosted 2.x exposes the CustomRpc channel as esp_hosted_{send_custom_data,
+ * register_custom_callback}; 3.x renamed it to the eh_cp_feat_peer_data feature
+ * with the same call shapes. */
+#if __has_include("eh_cp_feat_peer_data.h")
+#include "eh_cp_feat_peer_data.h"
+#define ESP_NOW_HOSTED_CP_3X 1
+#define esp_hosted_send_custom_data eh_cp_feat_peer_data_send
+#define esp_hosted_register_custom_callback eh_cp_feat_peer_data_register_callback
+#else
 #include "esp_hosted_peer_data.h"  /* esp_hosted_{send_custom_data,register_custom_callback} */
+#endif
 
 #include "esp_now_hosted_slave.h"
 #include "esp_now_hosted_rpc.h"
@@ -187,7 +197,18 @@ static void slave_req_cb(uint32_t msg_id, const uint8_t *data, size_t len, void 
 }
 
 esp_err_t esp_now_hosted_slave_init(void) {
-  esp_err_t err = esp_hosted_register_custom_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
+  esp_err_t err;
+#ifdef ESP_NOW_HOSTED_CP_3X
+  /* Registration needs the feature's handler table. Its init is idempotent, so
+   * running it here is harmless whether or not the core's auto-init walk has
+   * already done so. */
+  err = eh_cp_feat_peer_data_init();
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "failed to init peer data feature: 0x%x", err);
+    return err;
+  }
+#endif
+  err = esp_hosted_register_custom_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "failed to register ESP-NOW CustomRpc handler: 0x%x", err);
     return err;

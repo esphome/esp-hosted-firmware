@@ -38,6 +38,15 @@ scaffolded `slave/` project with only safe appends:
 
 It is idempotent and self-skips on ESP-Hosted < 2.8.1 (no CustomRpc channel).
 
+On an ESP-Hosted **3.x** co-processor project (`bluetooth/.../cp`, detected by
+`CONFIG_ESP_HOSTED_CP=y` in `sdkconfig.defaults`) the CustomRpc channel is the
+`eh_cp_feat_peer_data` feature. `esp_now_hosted_slave.c` maps the two
+`esp_hosted_*` calls onto it with `__has_include`, and the script instead
+rewrites the stock three-line `main/CMakeLists.txt` to add the source, the
+`esp_hosted`/`esp_wifi` requirements and the force-link, and appends
+`CONFIG_ESP_HOSTED_CP_FEAT_PEER_DATA=y`. Verified to build for the ESP32-C6
+with ESP-Hosted 3.0.8 on 2026-09-25 (not yet exercised on hardware).
+
 ## Wire-protocol coupling (important)
 
 `esp_now_hosted_rpc.h` defines the exact bytes exchanged with the ESPHome host
@@ -51,7 +60,10 @@ identically.
 Re-verify on each ESP-Hosted bump (see the design notes for the specifics):
 
 - the CustomRpc callback signature (`esp_hosted_register_custom_callback` gained
-  a 4th `void *local_context` arg around v2.8);
+  a 4th `void *local_context` arg around v2.8; 3.x's
+  `eh_cp_feat_peer_data_register_callback` has the same shape);
+- the 3.x `cp` project layout (`main/CMakeLists.txt` is rewritten wholesale, so
+  a stock change there needs mirroring in `apply-overlay.sh`);
 - the native `esp_now_send_cb_t` signature (changed to the `esp_now_send_info_t`
   form at IDF 5.5 — `esp_now_hosted_slave.c` version-guards it);
 - that host/slave ESP-Hosted versions stay matched.
