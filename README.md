@@ -94,7 +94,8 @@ For ESP-Hosted 3.x there is no `slave` example. The equivalent Wi-Fi + BT (VHCI)
 co-processor project is `bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp`
 (3.0.6 and newer; earlier 3.x releases are not supported), which produces
 `build/eh_cp_bt_wifi_hosted_hci_mcu.bin`. 3.x needs ESP-IDF v5.5.5 or newer.
-The ESP-NOW overlay applies to 3.x too (`apply-overlay.sh` detects the layout).
+The ESP-NOW overlay applies to 3.x too: `apply-overlay.sh` detects the layout and
+installs it as a `components/esp_now_hosted/` component.
 
 ```sh
 idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.8:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"

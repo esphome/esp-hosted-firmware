@@ -42,41 +42,19 @@ die() { echo "apply-overlay: ERROR: $*" >&2; exit 1; }
 # uses. If you revise the protocol, edit BOTH copies together.
 
 # ── esp_hosted 3.x co-processor layout ───────────────────────────────────────
-# 3.x scaffolds a plain IDF project (main/main.c + a three-line
-# idf_component_register) on top of the esp_hosted component, and the CustomRpc
-# channel is the eh_cp_feat_peer_data feature. The overlay sources compile
-# against either API (see esp_now_hosted_slave.c), so here we only need to add
-# the source, the component requirements, the force-link and the feature
-# Kconfig. main/CMakeLists.txt is rewritten wholesale: it is tiny, and its
-# stock content is known.
+# 3.x moved the CustomRpc channel into the esp_hosted component (the
+# eh_cp_feat_peer_data feature), so the overlay can be a self-contained
+# component that ESP-IDF discovers in the project's components/ directory.
+# Nothing in the scaffolded project is edited; only the feature Kconfig is
+# appended to sdkconfig.defaults.
 if [ -f "$CMAKE" ] && [ -f "$DEFAULTS" ] && grep -q "^CONFIG_ESP_HOSTED_CP=y" "$DEFAULTS"; then
-  # Only ever replace the known stock file (or our own rewrite of it), so an
-  # upstream change to main/CMakeLists.txt fails the build instead of being
-  # silently dropped.
-  STOCK_CMAKE='idf_component_register(SRCS"main.c"INCLUDE_DIRS"."REQUIRESnvs_flash)'
-  if ! grep -qF "$MARKER" "$CMAKE" && [ "$(tr -d '[:space:]' < "$CMAKE")" != "$STOCK_CMAKE" ]; then
-    die "$CMAKE is not the stock esp_hosted 3.x co-processor CMakeLists; update apply-overlay.sh"
-  fi
-
-  cp "$OVERLAY_DIR/esp_now_hosted_slave.c" "$MAIN_DIR/"
-  cp "$OVERLAY_DIR/esp_now_hosted_slave.h" "$MAIN_DIR/"
-  cp "$OVERLAY_DIR/esp_now_hosted_rpc.h"   "$MAIN_DIR/"
-  log "copied overlay sources into $MAIN_DIR/ (esp_hosted 3.x layout)"
-
-  cat > "$CMAKE" <<CMAKE_EOF
-idf_component_register(
-    SRCS          "main.c" "esp_now_hosted_slave.c"
-    INCLUDE_DIRS  "."
-    REQUIRES      nvs_flash esp_hosted
-    PRIV_REQUIRES esp_wifi
-)
-
-# --- $MARKER ---
-# Pull the self-registering ESP-NOW overlay object into the link (nothing
-# references its symbols, so it would otherwise be garbage-collected).
-target_link_libraries(\${COMPONENT_LIB} INTERFACE "-u esp_now_hosted_slave_init")
-CMAKE_EOF
-  log "rewrote $CMAKE with the overlay source, requirements and force-link"
+  COMPONENT_DIR="$SLAVE_DIR/components/esp_now_hosted"
+  mkdir -p "$COMPONENT_DIR"
+  cp "$OVERLAY_DIR/esp_now_hosted_slave.c" "$COMPONENT_DIR/"
+  cp "$OVERLAY_DIR/esp_now_hosted_slave.h" "$COMPONENT_DIR/"
+  cp "$OVERLAY_DIR/esp_now_hosted_rpc.h"   "$COMPONENT_DIR/"
+  cp "$OVERLAY_DIR/CMakeLists.txt"         "$COMPONENT_DIR/"
+  log "installed the overlay as component $COMPONENT_DIR (esp_hosted 3.x layout)"
 
   if grep -qF "$MARKER" "$DEFAULTS"; then
     log "sdkconfig.defaults already carries the overlay options (idempotent no-op)"
