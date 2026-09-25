@@ -91,11 +91,10 @@ idf.py build
 To build the *stock* slave without ESP-NOW, simply skip the `apply-overlay.sh` step.
 
 For ESP-Hosted 3.x there is no `slave` example. The equivalent Wi-Fi + BT (VHCI)
-co-processor project is `bluetooth/cp/wifi_hosted_hci` for 3.0.0 to 3.0.5 and
-`bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp` from 3.0.6 onwards; both
-produce `build/eh_cp_bt_wifi_hosted_hci_mcu.bin`. 3.x needs ESP-IDF v5.5.5 or
-newer. The ESP-NOW overlay applies to 3.x too (`apply-overlay.sh` detects the
-layout).
+co-processor project is `bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp`
+(3.0.6 and newer; earlier 3.x releases are not supported), which produces
+`build/eh_cp_bt_wifi_hosted_hci_mcu.bin`. 3.x needs ESP-IDF v5.5.5 or newer.
+The ESP-NOW overlay applies to 3.x too (`apply-overlay.sh` detects the layout).
 
 ```sh
 idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.8:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
