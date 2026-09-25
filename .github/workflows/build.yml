@@ -45,25 +45,31 @@ jobs:
       # esp_hosted 2.x ships the co-processor firmware as the "slave" example
       # (binary: network_adapter.bin). 3.x restructured the examples tree; the
       # equivalent Wi-Fi + BT (VHCI) co-processor firmware is the
-      # bluetooth/cp/wifi_hosted_hci profile.
+      # bluetooth/cp/wifi_hosted_hci profile up to 3.0.5, and from 3.0.6 the
+      # same project lives at bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp
+      # (the standalone bluetooth/cp/* profiles were removed).
       - name: Determine build parameters
         id: params
         run: |
           MAJOR="${ESP_HOSTED_VERSION%%.*}"
           if [ "$MAJOR" -ge 3 ]; then
-            echo "example=bluetooth/cp/wifi_hosted_hci" >> "$GITHUB_OUTPUT"
-            echo "project=wifi_hosted_hci" >> "$GITHUB_OUTPUT"
+            LOWEST=$(printf '%s\n' "$ESP_HOSTED_VERSION" "3.0.6" | sort -V | head -n1)
+            if [ "$LOWEST" = "3.0.6" ]; then
+              echo "example=bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp" >> "$GITHUB_OUTPUT"
+            else
+              echo "example=bluetooth/cp/wifi_hosted_hci" >> "$GITHUB_OUTPUT"
+            fi
             echo "binary=eh_cp_bt_wifi_hosted_hci_mcu.bin" >> "$GITHUB_OUTPUT"
           else
             echo "example=slave" >> "$GITHUB_OUTPUT"
-            echo "project=slave" >> "$GITHUB_OUTPUT"
             echo "binary=network_adapter.bin" >> "$GITHUB_OUTPUT"
           fi
+          echo "project=coprocessor" >> "$GITHUB_OUTPUT"
 
       - name: Create project from esp_hosted co-processor example
         run: |
           . $IDF_PATH/export.sh
-          idf.py create-project-from-example "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
+          idf.py create-project-from-example --path "${{ steps.params.outputs.project }}" "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
 
       - name: Apply ESP-NOW overlay
         # Injects the ESP-NOW-over-CustomRpc overlay (slave-overlay/) into the
