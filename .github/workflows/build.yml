@@ -31,6 +31,8 @@ jobs:
   # so there is a single place to bump. workflow_dispatch can override it.
   idf:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
@@ -49,7 +51,9 @@ jobs:
           fi
           # Docker images and git tags are v6.1, not v6.1.0
           VERSION="v${VERSION#v}"
-          VERSION="${VERSION%.0}"
+          case "$VERSION" in
+            v*.*.0) VERSION="${VERSION%.0}" ;;
+          esac
           echo "Using ESP-IDF $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
