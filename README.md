@@ -62,7 +62,7 @@ update:
 
 To build firmware locally, you'll need to set up the ESP-IDF environment. Use
 the ESP-IDF release that ESPHome recommends for the host, which is what CI
-builds with; `python3 .github/resolve_idf_version.py` prints it:
+builds with:
 
 ```sh
 # Clone and setup ESP-IDF
