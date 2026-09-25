@@ -21,6 +21,7 @@ running simultaneously — using ESPHome's `espnow` component unmodified.
 | `esp_now_hosted_slave.h` | `esp_now_hosted_slave_init()` declaration |
 | `esp_now_hosted_rpc.h`   | Wire protocol — **verbatim copy** of the host shim's; keep in sync |
 | `CMakeLists.txt`         | Component registration used on ESP-Hosted 3.x only |
+| `Kconfig`                | Selects the peer-data feature, ESP-Hosted 3.x only |
 
 ## How it is applied
 
@@ -43,10 +44,10 @@ On an ESP-Hosted **3.x** co-processor project (`bluetooth/.../cp`, detected by
 `CONFIG_ESP_HOSTED_CP=y` in `sdkconfig.defaults`) the CustomRpc channel is the
 `eh_cp_feat_peer_data` feature of the esp_hosted component itself, so the
 overlay is installed as a self-contained component instead: the sources plus
-[`CMakeLists.txt`](CMakeLists.txt) are copied to
-`components/esp_now_hosted/`, which ESP-IDF discovers on its own, and
-`CONFIG_ESP_HOSTED_CP_FEAT_PEER_DATA=y` is appended to `sdkconfig.defaults`.
-Nothing in the scaffolded project is edited. `esp_now_hosted_slave.c` selects
+[`CMakeLists.txt`](CMakeLists.txt) and [`Kconfig`](Kconfig) are copied to
+`components/esp_now_hosted/`, which ESP-IDF discovers on its own; the Kconfig
+selects `ESP_HOSTED_CP_FEAT_PEER_DATA`. Nothing in the scaffolded project is
+edited. `esp_now_hosted_slave.c` selects
 the 2.x or 3.x API at each call with `#ifdef CONFIG_ESP_HOSTED_CP`. Verified to
 build for the ESP32-C6 with ESP-Hosted 3.0.8 on 2026-09-25 (not yet exercised
 on hardware).

@@ -45,8 +45,8 @@ die() { echo "apply-overlay: ERROR: $*" >&2; exit 1; }
 # 3.x moved the CustomRpc channel into the esp_hosted component (the
 # eh_cp_feat_peer_data feature), so the overlay can be a self-contained
 # component that ESP-IDF discovers in the project's components/ directory.
-# Nothing in the scaffolded project is edited; only the feature Kconfig is
-# appended to sdkconfig.defaults.
+# Its Kconfig selects the feature, so nothing in the scaffolded project is
+# edited.
 if [ -f "$CMAKE" ] && [ -f "$DEFAULTS" ] && grep -q "^CONFIG_ESP_HOSTED_CP=y" "$DEFAULTS"; then
   COMPONENT_DIR="$SLAVE_DIR/components/esp_now_hosted"
   mkdir -p "$COMPONENT_DIR"
@@ -54,20 +54,8 @@ if [ -f "$CMAKE" ] && [ -f "$DEFAULTS" ] && grep -q "^CONFIG_ESP_HOSTED_CP=y" "$
   cp "$OVERLAY_DIR/esp_now_hosted_slave.h" "$COMPONENT_DIR/"
   cp "$OVERLAY_DIR/esp_now_hosted_rpc.h"   "$COMPONENT_DIR/"
   cp "$OVERLAY_DIR/CMakeLists.txt"         "$COMPONENT_DIR/"
+  cp "$OVERLAY_DIR/Kconfig"                "$COMPONENT_DIR/"
   log "installed the overlay as component $COMPONENT_DIR (esp_hosted 3.x layout)"
-
-  if grep -qF "$MARKER" "$DEFAULTS"; then
-    log "sdkconfig.defaults already carries the overlay options (idempotent no-op)"
-  else
-    {
-      echo ""
-      echo "# --- $MARKER ---"
-      echo "# esp-hosted CustomRpc (\"peer data transfer\") feature — carries ESP-NOW."
-      echo "CONFIG_ESP_HOSTED_CP_FEAT_PEER_DATA=y"
-    } >> "$DEFAULTS"
-    log "appended overlay options to $DEFAULTS"
-  fi
-
   log "ESP-NOW overlay applied."
   exit 0
 fi
