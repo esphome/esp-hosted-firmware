@@ -65,7 +65,7 @@ the ESP-IDF release that ESPHome recommends for the host, which is what CI
 builds with; `python3 .github/resolve_idf_version.py` prints it:
 
 ```sh
-# Clone and setup ESP-IDF (x.y.z = the version printed above)
+# Clone and setup ESP-IDF
 git clone -b vx.y.z --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
 ./install.sh esp32c6  # or your target
