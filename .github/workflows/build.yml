@@ -34,6 +34,9 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
       - name: Resolve ESP-IDF version
         id: resolve
         env:
@@ -42,13 +45,7 @@ jobs:
           if [ -n "$OVERRIDE" ]; then
             VERSION="$OVERRIDE"
           else
-            VERSION=$(curl -fsSL https://raw.githubusercontent.com/esphome/esphome/dev/esphome/components/esp32/__init__.py \
-              | sed -n '/^ESP_IDF_FRAMEWORK_VERSION_LOOKUP = {/,/^}/p' \
-              | sed -n 's/.*"recommended": cv.Version(\([0-9]*\), \([0-9]*\), \([0-9]*\)).*/\1.\2.\3/p')
-          fi
-          if [ -z "$VERSION" ]; then
-            echo "Could not resolve the ESP-IDF version" >&2
-            exit 1
+            VERSION=$(python3 .github/resolve_idf_version.py)
           fi
           # Docker images and git tags are v6.1, not v6.1.0
           VERSION="v${VERSION#v}"
