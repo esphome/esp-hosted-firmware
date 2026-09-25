@@ -40,8 +40,8 @@ It is idempotent and self-skips on ESP-Hosted < 2.8.1 (no CustomRpc channel).
 
 On an ESP-Hosted **3.x** co-processor project (`bluetooth/.../cp`, detected by
 `CONFIG_ESP_HOSTED_CP=y` in `sdkconfig.defaults`) the CustomRpc channel is the
-`eh_cp_feat_peer_data` feature. `esp_now_hosted_slave.c` maps the two
-`esp_hosted_*` calls onto it with `__has_include`, and the script instead
+`eh_cp_feat_peer_data` feature. `esp_now_hosted_slave.c` selects the API at
+each call with `#ifdef CONFIG_ESP_HOSTED_CP`, and the script instead
 rewrites the stock three-line `main/CMakeLists.txt` to add the source, the
 `esp_hosted`/`esp_wifi` requirements and the force-link, and appends
 `CONFIG_ESP_HOSTED_CP_FEAT_PEER_DATA=y`. Verified to build for the ESP32-C6
