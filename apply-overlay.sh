@@ -50,6 +50,14 @@ die() { echo "apply-overlay: ERROR: $*" >&2; exit 1; }
 # Kconfig. main/CMakeLists.txt is rewritten wholesale: it is tiny, and its
 # stock content is known.
 if [ -f "$CMAKE" ] && [ -f "$DEFAULTS" ] && grep -q "^CONFIG_ESP_HOSTED_CP=y" "$DEFAULTS"; then
+  # Only ever replace the known stock file (or our own rewrite of it), so an
+  # upstream change to main/CMakeLists.txt fails the build instead of being
+  # silently dropped.
+  STOCK_CMAKE='idf_component_register(SRCS"main.c"INCLUDE_DIRS"."REQUIRESnvs_flash)'
+  if ! grep -qF "$MARKER" "$CMAKE" && [ "$(tr -d '[:space:]' < "$CMAKE")" != "$STOCK_CMAKE" ]; then
+    die "$CMAKE is not the stock esp_hosted 3.x co-processor CMakeLists; update apply-overlay.sh"
+  fi
+
   cp "$OVERLAY_DIR/esp_now_hosted_slave.c" "$MAIN_DIR/"
   cp "$OVERLAY_DIR/esp_now_hosted_slave.h" "$MAIN_DIR/"
   cp "$OVERLAY_DIR/esp_now_hosted_rpc.h"   "$MAIN_DIR/"

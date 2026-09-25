@@ -220,8 +220,6 @@ esp_err_t esp_now_hosted_slave_init(void) {
     ESP_LOGE(TAG, "failed to init peer data feature: 0x%x", err);
     return err;
   }
-#endif
-#ifdef CONFIG_ESP_HOSTED_CP
   err = eh_cp_feat_peer_data_register_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
 #else
   err = esp_hosted_register_custom_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
