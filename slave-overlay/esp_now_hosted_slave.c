@@ -22,7 +22,14 @@
 #include "esp_now.h"   /* NATIVE ESP-NOW on the co-processor */
 #include "esp_wifi.h"
 
-#include "esp_hosted_peer_data.h"  /* esp_hosted_{send_custom_data,register_custom_callback} */
+/* esp_hosted 2.x exposes the CustomRpc channel as esp_hosted_{send_custom_data,
+ * register_custom_callback}; 3.x renamed it to the eh_cp_feat_peer_data feature
+ * with the same call shapes. */
+#ifdef CONFIG_ESP_HOSTED_CP
+#include "eh_cp_feat_peer_data.h"
+#else
+#include "esp_hosted_peer_data.h"
+#endif
 
 #include "esp_now_hosted_slave.h"
 #include "esp_now_hosted_rpc.h"
@@ -30,7 +37,7 @@
 static const char *TAG = "esp_now_hosted";
 
 /* ── Native ESP-NOW callbacks (run in the co-processor Wi-Fi task) → events ───
- * esp_hosted_send_custom_data() enqueues onto the RPC TX path; safe to call
+ * Sending enqueues onto the RPC TX path; safe to call
  * from the Wi-Fi task. Frames are <= ESP_NOW_HOSTED_MAX_FRAME, well under the
  * 8166 B CustomRpc cap.                                                        */
 
@@ -45,7 +52,11 @@ static void slave_recv_cb(const esp_now_recv_info_t *info, const uint8_t *data, 
   e->channel = info->rx_ctrl ? info->rx_ctrl->channel : 0;
   e->data_len = (uint16_t) len;
   memcpy(e->data, data, len);
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_RECV, buf, sizeof(*e) + len);
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_RECV, buf, sizeof(*e) + len);
+#endif
 }
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
@@ -53,14 +64,22 @@ static void slave_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_statu
   esp_now_hosted_send_evt_t e;
   memcpy(e.des_addr, tx_info->des_addr, 6);
   e.status = (uint8_t) status;
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#endif
 }
 #else
 static void slave_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
   esp_now_hosted_send_evt_t e;
   memcpy(e.des_addr, mac_addr, 6);
   e.status = (uint8_t) status;
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#endif
 }
 #endif
 
@@ -183,11 +202,28 @@ static void slave_req_cb(uint32_t msg_id, const uint8_t *data, size_t len, void 
       break;
   }
 
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_RESP, rbuf, resp_len);
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_RESP, rbuf, resp_len);
+#endif
 }
 
 esp_err_t esp_now_hosted_slave_init(void) {
-  esp_err_t err = esp_hosted_register_custom_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
+  esp_err_t err;
+#ifdef CONFIG_ESP_HOSTED_CP
+  /* Registration needs the feature's handler table. Its init is idempotent, so
+   * running it here is harmless whether or not the core's auto-init walk has
+   * already done so. */
+  err = eh_cp_feat_peer_data_init();
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "failed to init peer data feature: 0x%x", err);
+    return err;
+  }
+  err = eh_cp_feat_peer_data_register_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
+#else
+  err = esp_hosted_register_custom_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
+#endif
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "failed to register ESP-NOW CustomRpc handler: 0x%x", err);
     return err;

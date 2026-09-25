@@ -10,7 +10,7 @@ on:
       version:
         description: 'ESP-Hosted version to build'
         type: string
-        default: '3.0.5'
+        default: '3.0.8'
       idf_version:
         description: 'ESP-IDF version (blank = the version ESPHome recommends)'
         type: string
@@ -23,7 +23,7 @@ on:
 permissions: {}
 
 env:
-  ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.5' }}
+  ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.8' }}
 
 jobs:
   # The co-processor is built with the same ESP-IDF release that ESPHome
@@ -80,33 +80,33 @@ jobs:
       # esp_hosted 2.x ships the co-processor firmware as the "slave" example
       # (binary: network_adapter.bin). 3.x restructured the examples tree; the
       # equivalent Wi-Fi + BT (VHCI) co-processor firmware is the
-      # bluetooth/cp/wifi_hosted_hci profile.
+      # bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp project (3.0.6 and
+      # newer; earlier 3.x releases are not supported).
       - name: Determine build parameters
         id: params
         run: |
           MAJOR="${ESP_HOSTED_VERSION%%.*}"
           if [ "$MAJOR" -ge 3 ]; then
-            echo "example=bluetooth/cp/wifi_hosted_hci" >> "$GITHUB_OUTPUT"
-            echo "project=wifi_hosted_hci" >> "$GITHUB_OUTPUT"
+            echo "example=bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp" >> "$GITHUB_OUTPUT"
             echo "binary=eh_cp_bt_wifi_hosted_hci_mcu.bin" >> "$GITHUB_OUTPUT"
           else
             echo "example=slave" >> "$GITHUB_OUTPUT"
-            echo "project=slave" >> "$GITHUB_OUTPUT"
             echo "binary=network_adapter.bin" >> "$GITHUB_OUTPUT"
           fi
+          echo "project=coprocessor" >> "$GITHUB_OUTPUT"
 
       - name: Create project from esp_hosted co-processor example
         run: |
           . $IDF_PATH/export.sh
-          idf.py create-project-from-example "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
+          idf.py create-project-from-example --path "${{ steps.params.outputs.project }}" "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
 
       - name: Apply ESP-NOW overlay
         # Injects the ESP-NOW-over-CustomRpc overlay (slave-overlay/) into the
         # scaffolded project so the firmware also carries ESP-NOW, which upstream
-        # esp-hosted does not yet proxy (espressif/esp-hosted-mcu#19). Self-skips
-        # unless the project matches the esp_hosted 2.x "slave" layout with the
-        # CustomRpc peer-data-transfer channel (>= 2.8.1) — so esp_hosted < 2.8.1
-        # and the restructured 3.x co-processor example build unmodified.
+        # esp-hosted does not yet proxy (espressif/esp-hosted-mcu#19). Handles
+        # the esp_hosted 2.x "slave" layout (>= 2.8.1, when the CustomRpc
+        # peer-data-transfer channel appeared) and the 3.x co-processor
+        # project; esp_hosted < 2.8.1 builds unmodified.
         run: ./apply-overlay.sh "${{ steps.params.outputs.project }}"
 
       - name: Build firmware

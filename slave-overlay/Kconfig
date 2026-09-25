@@ -1,0 +1,12 @@
+menu "ESP-NOW over ESP-Hosted"
+
+    config ESP_NOW_HOSTED
+        bool "Bridge ESP-NOW to the host over the CustomRpc channel"
+        default y
+        select ESP_HOSTED_CP_FEAT_PEER_DATA
+        help
+            Carries the native esp_now_* API over esp_hosted's peer data
+            transfer feature so a radio-less host can use ESP-NOW through
+            this co-processor.
+
+endmenu
