@@ -1,5 +1,5 @@
-# esp_hosted 3.x only: the overlay is dropped into the scaffolded project as a
-# component (components/esp_now_hosted/), which ESP-IDF discovers on its own.
+# esp_hosted 3.x only: this directory is copied verbatim into the scaffolded
+# project as components/esp_now_hosted/, which ESP-IDF discovers on its own.
 # Nothing references the overlay's symbols (it self-registers from a
 # constructor), so force the object into the link.
 idf_component_register(

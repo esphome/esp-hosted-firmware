@@ -87,11 +87,17 @@ jobs:
         run: |
           MAJOR="${ESP_HOSTED_VERSION%%.*}"
           if [ "$MAJOR" -ge 3 ]; then
+            if [ "$(printf '%s\n' 3.0.6 "$ESP_HOSTED_VERSION" | sort -V | head -n1)" != "3.0.6" ]; then
+              echo "::error::esp_hosted $ESP_HOSTED_VERSION is not supported; 3.x builds need 3.0.6 or newer"
+              exit 1
+            fi
             echo "example=bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp" >> "$GITHUB_OUTPUT"
             echo "binary=eh_cp_bt_wifi_hosted_hci_mcu.bin" >> "$GITHUB_OUTPUT"
+            echo "overlay=component" >> "$GITHUB_OUTPUT"
           else
             echo "example=slave" >> "$GITHUB_OUTPUT"
             echo "binary=network_adapter.bin" >> "$GITHUB_OUTPUT"
+            echo "overlay=script" >> "$GITHUB_OUTPUT"
           fi
           echo "project=coprocessor" >> "$GITHUB_OUTPUT"
 
@@ -100,14 +106,24 @@ jobs:
           . $IDF_PATH/export.sh
           idf.py create-project-from-example --path "${{ steps.params.outputs.project }}" "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
 
-      - name: Apply ESP-NOW overlay
-        # Injects the ESP-NOW-over-CustomRpc overlay (slave-overlay/) into the
-        # scaffolded project so the firmware also carries ESP-NOW, which upstream
-        # esp-hosted does not yet proxy (espressif/esp-hosted-mcu#19). Handles
-        # the esp_hosted 2.x "slave" layout (>= 2.8.1, when the CustomRpc
-        # peer-data-transfer channel appeared) and the 3.x co-processor
-        # project; esp_hosted < 2.8.1 builds unmodified.
+      # The ESP-NOW-over-CustomRpc overlay (slave-overlay/) gives the firmware
+      # ESP-NOW, which upstream esp-hosted does not yet proxy
+      # (espressif/esp-hosted-mcu#19).
+      - name: Apply ESP-NOW overlay (esp_hosted 2.x)
+        # The 2.x "slave" example keeps the CustomRpc API private to main/, so
+        # the overlay has to be spliced into it. Self-skips on esp_hosted < 2.8.1,
+        # which has no CustomRpc channel.
+        if: steps.params.outputs.overlay == 'script'
         run: ./apply-overlay.sh "${{ steps.params.outputs.project }}"
+
+      - name: Add ESP-NOW overlay component (esp_hosted 3.x)
+        # On 3.x the CustomRpc channel is a feature of the esp_hosted component,
+        # so slave-overlay/ is a complete ESP-IDF component: copy it into the
+        # project's components/ directory and ESP-IDF picks it up on its own.
+        if: steps.params.outputs.overlay == 'component'
+        run: |
+          mkdir -p "${{ steps.params.outputs.project }}/components"
+          cp -r slave-overlay "${{ steps.params.outputs.project }}/components/esp_now_hosted"
 
       - name: Build firmware
         working-directory: ${{ steps.params.outputs.project }}

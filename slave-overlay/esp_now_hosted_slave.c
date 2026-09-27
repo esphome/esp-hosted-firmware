@@ -10,8 +10,9 @@
  *   native recv cb              --> ESP_NOW_HOSTED_MSG_RECV event --> host
  *   native send cb              --> ESP_NOW_HOSTED_MSG_SEND event --> host
  *
- * Overlay this file onto the esp-hosted `slave` example (see README.md) and add
- * a single call to esp_now_hosted_slave_init() at slave start-up.
+ * Built into the esp-hosted co-processor firmware (see README.md): spliced into
+ * the 2.x `slave` example's main/ by apply-overlay.sh, or dropped in as an
+ * ESP-IDF component on 3.x. It self-registers from a constructor.
  */
 
 #include <string.h>
@@ -37,9 +38,9 @@
 static const char *TAG = "esp_now_hosted";
 
 /* ── Native ESP-NOW callbacks (run in the co-processor Wi-Fi task) → events ───
- * Sending enqueues onto the RPC TX path; safe to call
- * from the Wi-Fi task. Frames are <= ESP_NOW_HOSTED_MAX_FRAME, well under the
- * 8166 B CustomRpc cap.                                                        */
+ * Sending enqueues onto the RPC TX path; safe to call from the Wi-Fi task.
+ * Frames are <= ESP_NOW_HOSTED_MAX_FRAME, well under the CustomRpc cap on both
+ * 2.x (8166 B) and 3.x (fragmented on the wire, 16 KiB reassembly limit).     */
 
 static void slave_recv_cb(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   if (len < 0 || len > (int) ESP_NOW_HOSTED_MAX_FRAME)
@@ -232,21 +233,22 @@ esp_err_t esp_now_hosted_slave_init(void) {
   return err;
 }
 
-/* Self-registration so the overlay needs no edit to the stock
- * esp_hosted_coprocessor.c. esp_now_hosted_slave_init() only registers a
- * CustomRpc callback (fills a static handler slot + creates a mutex — no
- * transport, Wi-Fi, or heap-hungry work), so running it from a constructor
- * before app_main is safe.
+/* Self-registration so the overlay needs no edit to the stock co-processor
+ * sources. esp_now_hosted_slave_init() only registers a CustomRpc callback
+ * (fills a static handler slot + creates a mutex — no transport, Wi-Fi, or
+ * heap-hungry work), so running it from a constructor before app_main is safe.
+ * On 3.x the feature's own init is idempotent and the core's later auto-init
+ * pass leaves the handler table alone, so the registration survives it.
  *
  * IMPORTANT: nothing references this object's symbols, so the linker would
  * garbage-collect the whole translation unit (and this constructor with it) —
- * exactly what happens to the stock example_peer_data_transfer.c. apply-overlay.sh
- * therefore also adds `-u esp_now_hosted_slave_init` to main/CMakeLists.txt to
+ * exactly what happens to the stock example_peer_data_transfer.c. The build
+ * therefore passes `-u esp_now_hosted_slave_init` (added to main/CMakeLists.txt
+ * by apply-overlay.sh on 2.x, set in this component's CMakeLists.txt on 3.x) to
  * force the object into the link. Without that flag this constructor never runs.
  *
  * If a future esp_hosted makes init unsafe this early, drop this constructor and
- * call esp_now_hosted_slave_init() next to example_peer_data_transfer_init() in
- * esp_hosted_coprocessor.c instead. */
+ * call esp_now_hosted_slave_init() from the co-processor's app_main instead. */
 static void __attribute__((constructor)) esp_now_hosted_autoreg(void) {
   esp_now_hosted_slave_init();
 }
