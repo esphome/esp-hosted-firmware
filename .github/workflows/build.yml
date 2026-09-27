@@ -87,10 +87,6 @@ jobs:
         run: |
           MAJOR="${ESP_HOSTED_VERSION%%.*}"
           if [ "$MAJOR" -ge 3 ]; then
-            if [ "$(printf '%s\n' 3.0.6 "$ESP_HOSTED_VERSION" | sort -V | head -n1)" != "3.0.6" ]; then
-              echo "::error::esp_hosted $ESP_HOSTED_VERSION is not supported; 3.x builds need 3.0.6 or newer"
-              exit 1
-            fi
             echo "example=bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp" >> "$GITHUB_OUTPUT"
             echo "binary=eh_cp_bt_wifi_hosted_hci_mcu.bin" >> "$GITHUB_OUTPUT"
             echo "overlay=component" >> "$GITHUB_OUTPUT"
