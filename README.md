@@ -8,7 +8,7 @@ For full documentation, see the [ESP32 Hosted Update](https://esphome.io/compone
 
 These binaries are the stock ESP-Hosted slave **plus a small overlay that adds ESP-NOW to the host↔co-processor link**. Upstream ESP-Hosted proxies `esp_wifi.h` but not `esp_now.h` (Espressif tracking issue [esp-hosted-mcu#19](https://github.com/espressif/esp-hosted-mcu/issues/19)), so a radio-less host such as the ESP32-P4 cannot use ESP-NOW through the co-processor out of the box. The overlay bridges the native `esp_now_*` API over ESP-Hosted's CustomRpc channel, letting ESPHome's `espnow` component run unmodified on a hosted host. It was validated on real hardware (ESP32-P4 + ESP32-C6) on 2026-07-20.
 
-The overlay lives in [`slave-overlay/`](slave-overlay/) and is injected into each CI build by [`apply-overlay.sh`](apply-overlay.sh). It only applies to ESP-Hosted **≥ 2.8.1** (when the CustomRpc "peer data transfer" channel was added); older versions build as the unmodified stock slave.
+The overlay lives in [`slave-overlay/`](slave-overlay/). On ESP-Hosted 2.x it is injected into each CI build by [`apply-overlay.sh`](apply-overlay.sh) and only applies to **≥ 2.8.1** (when the CustomRpc "peer data transfer" channel was added); older versions build as the unmodified stock slave. On ESP-Hosted 3.x the directory is a complete ESP-IDF component and is copied straight into the project's `components/`.
 
 > **Wire-protocol coupling.** `slave-overlay/esp_now_hosted_rpc.h` is the on-the-wire contract and must stay byte-identical to the copy the ESPHome host shim (the `esp_now_hosted` half of the `esp32_hosted` component) uses. If the protocol changes, update **both** copies together.
 
@@ -89,6 +89,23 @@ idf.py build
 ```
 
 To build the *stock* slave without ESP-NOW, simply skip the `apply-overlay.sh` step.
+
+For ESP-Hosted 3.x there is no `slave` example. The equivalent Wi-Fi + BT (VHCI)
+co-processor project is `bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp`
+(3.0.6 and newer; earlier 3.x releases are not supported), which produces
+`build/eh_cp_bt_wifi_hosted_hci_mcu.bin`. 3.x needs ESP-IDF 5.5 or newer (CI
+uses the release ESPHome recommends). The ESP-NOW overlay applies to 3.x too:
+`slave-overlay/` is a complete ESP-IDF component there, so instead of running
+`apply-overlay.sh` just copy it into the project's `components/` directory.
+
+```sh
+idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.8:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
+mkdir -p coprocessor/components
+cp -r slave-overlay coprocessor/components/esp_now_hosted
+cd coprocessor/
+idf.py set-target esp32c6
+idf.py build
+```
 
 After building, copy the firmware to your ESPHome configuration directory:
 

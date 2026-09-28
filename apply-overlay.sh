@@ -43,9 +43,10 @@ die() { echo "apply-overlay: ERROR: $*" >&2; exit 1; }
 # ── Layout / version gate ────────────────────────────────────────────────────
 # The overlay targets the esp_hosted 2.x "slave" example: a main/ component with
 # the CustomRpc "peer data transfer" channel (esp_hosted >= 2.8.1). Skip — never
-# fail — when the scaffolded project isn't that layout, so both esp_hosted < 2.8.1
-# (no CustomRpc) and the restructured 3.x co-processor example (a different
-# project entirely) build unmodified.
+# fail — when the scaffolded project isn't that layout, so esp_hosted < 2.8.1
+# (no CustomRpc) builds unmodified. esp_hosted 3.x is not routed through this
+# script at all: there slave-overlay/ is a ready-made ESP-IDF component and the
+# workflow copies it straight into the project's components/ directory.
 if [ ! -f "$CMAKE" ] \
    || ! grep -q "CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER" "$CMAKE" \
    || [ ! -f "$MAIN_DIR/esp_hosted_peer_data.h" ]; then
