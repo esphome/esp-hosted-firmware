@@ -99,7 +99,7 @@ uses the release ESPHome recommends). The ESP-NOW overlay applies to 3.x too:
 `apply-overlay.sh` just copy it into the project's `components/` directory.
 
 ```sh
-idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.8:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
+idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.9:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
 mkdir -p coprocessor/components
 cp -r slave-overlay coprocessor/components/esp_now_hosted
 cd coprocessor/

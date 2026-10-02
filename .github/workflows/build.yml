@@ -23,7 +23,7 @@ on:
 permissions: {}
 
 env:
-  ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.8' }}
+  ESP_HOSTED_VERSION: ${{ inputs.version || '3.0.9' }}
 
 jobs:
   # The co-processor is built with the same ESP-IDF release that ESPHome
