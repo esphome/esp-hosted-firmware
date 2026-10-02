@@ -107,6 +107,17 @@ idf.py set-target esp32c6
 idf.py build
 ```
 
+The 3.x CI builds also enable WPA2 Enterprise (EAP), which the stock
+co-processor example leaves out to save flash, so ESPHome's `wifi:` `eap:`
+option works through the co-processor. To match that in a custom build, add
+these to `sdkconfig.defaults` before building (replacing the example's
+`CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n` line):
+
+```
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=y
+CONFIG_ESP_HOSTED_CP_FEAT_WIFI_EXT_ENT=y
+```
+
 After building, copy the firmware to your ESPHome configuration directory:
 
 ```sh

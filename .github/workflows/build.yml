@@ -121,6 +121,19 @@ jobs:
           mkdir -p "${{ steps.params.outputs.project }}/components"
           cp -r slave-overlay "${{ steps.params.outputs.project }}/components/esp_now_hosted"
 
+      - name: Enable WPA2 Enterprise (esp_hosted 3.x)
+        # The co-processor example turns the supplicant's enterprise support off
+        # to save flash. ESPHome's wifi component sends the EAP RPCs whenever
+        # 'eap:' is configured, so turn it back on together with the esp_hosted
+        # feature that handles those RPCs. Costs about 80 KB of flash.
+        if: steps.params.outputs.overlay == 'component'
+        run: |
+          DEFAULTS="${{ steps.params.outputs.project }}/sdkconfig.defaults"
+          sed -i '/^CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=/d' "$DEFAULTS"
+          printf '%s\n' \
+            'CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=y' \
+            'CONFIG_ESP_HOSTED_CP_FEAT_WIFI_EXT_ENT=y' >> "$DEFAULTS"
+
       - name: Build firmware
         working-directory: ${{ steps.params.outputs.project }}
         run: |
