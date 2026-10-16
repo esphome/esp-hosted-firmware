@@ -54,7 +54,7 @@ Each release contains:
 To build it locally from an exported ESP-IDF environment:
 
 ```sh
-./ot-rcp/build-ot-rcp.sh esp32h2 out/
+bash ./ot-rcp/build-ot-rcp.sh esp32h2 out/
 ```
 
 ## Usage

@@ -164,7 +164,7 @@ jobs:
       - name: Build OpenThread RCP firmware
         run: |
           . $IDF_PATH/export.sh
-          ./ot-rcp/build-ot-rcp.sh "${{ matrix.target }}" artifacts
+          bash ./ot-rcp/build-ot-rcp.sh "${{ matrix.target }}" artifacts
 
       - name: Upload artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
