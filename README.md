@@ -23,6 +23,40 @@ Only targets supporting SDIO transport are built:
 | ESP32-C6 | Yes | Built |
 | ESP32-C61 | Yes | Built |
 
+## OpenThread RCP (ESP32-H2)
+
+The [ESP Thread Border Router/Zigbee Gateway Board](https://docs.espressif.com/projects/esp-thread-br/en/latest/hardware_platforms.html)
+pairs an ESP32-S3 host with an ESP32-H2-MINI-1 that acts as an OpenThread
+**radio co-processor (RCP)** for IEEE 802.15.4. The H2 does not run ESP-Hosted;
+it runs ESP-IDF's [`ot_rcp`](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_rcp)
+example, which every release builds alongside the ESP-Hosted binaries, using the
+same ESP-IDF version. The board's settings are in
+[`ot-rcp/sdkconfig.defaults.thread_br`](ot-rcp/sdkconfig.defaults.thread_br):
+
+| Signal | ESP32-S3 (host) | ESP32-H2 (RCP) |
+|--------|-----------------|----------------|
+| UART (host TX → RCP RX) | GPIO18 | GPIO23 |
+| UART (host RX ← RCP TX) | GPIO17 | GPIO24 |
+| RCP reset | GPIO7 | EN |
+| RCP boot | GPIO8 | GPIO9 |
+
+The UART runs at 460800 baud, 8N1, with no flow control. External (PTA) coexistence is
+left disabled, which is the board's default.
+
+Each release contains:
+
+| File | Use |
+|------|-----|
+| `ot_rcp_esp32h2.bin` | Bootloader, partition table and app merged into one image. Flash it at `0x0` through the H2's own USB-C port (USB1): `esptool.py --chip esp32h2 write_flash 0x0 ot_rcp_esp32h2.bin` |
+| `rcp_image_esp32h2.bin` | The same firmware packed in [`esp_rcp_update`](https://github.com/espressif/esp-thread-br/tree/main/components/esp_rcp_update)'s image format. The host uses it to reflash the RCP over the UART and the reset/boot lines. This is the file the `esp32h2.json` manifest points to. |
+| `rcp_version_esp32h2` | The RCP version string the firmware reports over Spinel |
+
+To build it locally from an exported ESP-IDF environment:
+
+```sh
+./ot-rcp/build-ot-rcp.sh esp32h2 out/
+```
+
 ## Usage
 
 Pre-built firmware binaries and manifests are available at [esphome.github.io/esp-hosted-firmware](https://esphome.github.io/esp-hosted-firmware/).
