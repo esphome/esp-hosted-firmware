@@ -1,0 +1,7 @@
+# esp_hosted 3.x only. Always on: the overlay is present exactly when this
+# directory was copied into the project's components/, so the only job of this
+# symbol is to pull in the CustomRpc channel the overlay is built on.
+config ESP_NOW_HOSTED
+    bool
+    default y
+    select ESP_HOSTED_CP_FEAT_PEER_DATA

@@ -10,8 +10,9 @@
  *   native recv cb              --> ESP_NOW_HOSTED_MSG_RECV event --> host
  *   native send cb              --> ESP_NOW_HOSTED_MSG_SEND event --> host
  *
- * Overlay this file onto the esp-hosted `slave` example (see README.md) and add
- * a single call to esp_now_hosted_slave_init() at slave start-up.
+ * Built into the esp-hosted co-processor firmware (see README.md): spliced into
+ * the 2.x `slave` example's main/ by apply-overlay.sh, or dropped in as an
+ * ESP-IDF component on 3.x. It self-registers from a constructor.
  */
 
 #include <string.h>
@@ -22,7 +23,14 @@
 #include "esp_now.h"   /* NATIVE ESP-NOW on the co-processor */
 #include "esp_wifi.h"
 
-#include "esp_hosted_peer_data.h"  /* esp_hosted_{send_custom_data,register_custom_callback} */
+/* esp_hosted 2.x exposes the CustomRpc channel as esp_hosted_{send_custom_data,
+ * register_custom_callback}; 3.x renamed it to the eh_cp_feat_peer_data feature
+ * with the same call shapes. */
+#ifdef CONFIG_ESP_HOSTED_CP
+#include "eh_cp_feat_peer_data.h"
+#else
+#include "esp_hosted_peer_data.h"
+#endif
 
 #include "esp_now_hosted_slave.h"
 #include "esp_now_hosted_rpc.h"
@@ -30,9 +38,9 @@
 static const char *TAG = "esp_now_hosted";
 
 /* ── Native ESP-NOW callbacks (run in the co-processor Wi-Fi task) → events ───
- * esp_hosted_send_custom_data() enqueues onto the RPC TX path; safe to call
- * from the Wi-Fi task. Frames are <= ESP_NOW_HOSTED_MAX_FRAME, well under the
- * 8166 B CustomRpc cap.                                                        */
+ * Sending enqueues onto the RPC TX path; safe to call from the Wi-Fi task.
+ * Frames are <= ESP_NOW_HOSTED_MAX_FRAME, well under the CustomRpc cap on both
+ * 2.x (8166 B) and 3.x (fragmented on the wire, 16 KiB reassembly limit).     */
 
 static void slave_recv_cb(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   if (len < 0 || len > (int) ESP_NOW_HOSTED_MAX_FRAME)
@@ -45,7 +53,11 @@ static void slave_recv_cb(const esp_now_recv_info_t *info, const uint8_t *data, 
   e->channel = info->rx_ctrl ? info->rx_ctrl->channel : 0;
   e->data_len = (uint16_t) len;
   memcpy(e->data, data, len);
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_RECV, buf, sizeof(*e) + len);
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_RECV, buf, sizeof(*e) + len);
+#endif
 }
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
@@ -53,14 +65,22 @@ static void slave_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_statu
   esp_now_hosted_send_evt_t e;
   memcpy(e.des_addr, tx_info->des_addr, 6);
   e.status = (uint8_t) status;
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#endif
 }
 #else
 static void slave_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
   esp_now_hosted_send_evt_t e;
   memcpy(e.des_addr, mac_addr, 6);
   e.status = (uint8_t) status;
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_SEND, (const uint8_t *) &e, sizeof(e));
+#endif
 }
 #endif
 
@@ -183,11 +203,28 @@ static void slave_req_cb(uint32_t msg_id, const uint8_t *data, size_t len, void 
       break;
   }
 
+#ifdef CONFIG_ESP_HOSTED_CP
+  eh_cp_feat_peer_data_send(ESP_NOW_HOSTED_MSG_RESP, rbuf, resp_len);
+#else
   esp_hosted_send_custom_data(ESP_NOW_HOSTED_MSG_RESP, rbuf, resp_len);
+#endif
 }
 
 esp_err_t esp_now_hosted_slave_init(void) {
-  esp_err_t err = esp_hosted_register_custom_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
+  esp_err_t err;
+#ifdef CONFIG_ESP_HOSTED_CP
+  /* Registration needs the feature's handler table. Its init is idempotent, so
+   * running it here is harmless whether or not the core's auto-init walk has
+   * already done so. */
+  err = eh_cp_feat_peer_data_init();
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "failed to init peer data feature: 0x%x", err);
+    return err;
+  }
+  err = eh_cp_feat_peer_data_register_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
+#else
+  err = esp_hosted_register_custom_callback(ESP_NOW_HOSTED_MSG_REQ, slave_req_cb, NULL);
+#endif
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "failed to register ESP-NOW CustomRpc handler: 0x%x", err);
     return err;
@@ -196,21 +233,22 @@ esp_err_t esp_now_hosted_slave_init(void) {
   return err;
 }
 
-/* Self-registration so the overlay needs no edit to the stock
- * esp_hosted_coprocessor.c. esp_now_hosted_slave_init() only registers a
- * CustomRpc callback (fills a static handler slot + creates a mutex — no
- * transport, Wi-Fi, or heap-hungry work), so running it from a constructor
- * before app_main is safe.
+/* Self-registration so the overlay needs no edit to the stock co-processor
+ * sources. esp_now_hosted_slave_init() only registers a CustomRpc callback
+ * (fills a static handler slot + creates a mutex — no transport, Wi-Fi, or
+ * heap-hungry work), so running it from a constructor before app_main is safe.
+ * On 3.x the feature's own init is idempotent and the core's later auto-init
+ * pass leaves the handler table alone, so the registration survives it.
  *
  * IMPORTANT: nothing references this object's symbols, so the linker would
  * garbage-collect the whole translation unit (and this constructor with it) —
- * exactly what happens to the stock example_peer_data_transfer.c. apply-overlay.sh
- * therefore also adds `-u esp_now_hosted_slave_init` to main/CMakeLists.txt to
+ * exactly what happens to the stock example_peer_data_transfer.c. The build
+ * therefore passes `-u esp_now_hosted_slave_init` (added to main/CMakeLists.txt
+ * by apply-overlay.sh on 2.x, set in this component's CMakeLists.txt on 3.x) to
  * force the object into the link. Without that flag this constructor never runs.
  *
  * If a future esp_hosted makes init unsafe this early, drop this constructor and
- * call esp_now_hosted_slave_init() next to example_peer_data_transfer_init() in
- * esp_hosted_coprocessor.c instead. */
+ * call esp_now_hosted_slave_init() from the co-processor's app_main instead. */
 static void __attribute__((constructor)) esp_now_hosted_autoreg(void) {
   esp_now_hosted_slave_init();
 }

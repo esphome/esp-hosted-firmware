@@ -20,8 +20,12 @@ running simultaneously — using ESPHome's `espnow` component unmodified.
 | `esp_now_hosted_slave.c` | Slave handlers: REQ→native `esp_now_*`, recv/send→async events. Self-registers via a `__constructor__`, so no edit to the stock `esp_hosted_coprocessor.c` is needed. |
 | `esp_now_hosted_slave.h` | `esp_now_hosted_slave_init()` declaration |
 | `esp_now_hosted_rpc.h`   | Wire protocol — **verbatim copy** of the host shim's; keep in sync |
+| `CMakeLists.txt`         | ESP-IDF component registration + force-link; ESP-Hosted 3.x only |
+| `Kconfig`                | Selects the 3.x peer-data feature; ESP-Hosted 3.x only |
 
 ## How it is applied
+
+### ESP-Hosted 2.x
 
 [`../apply-overlay.sh`](../apply-overlay.sh) injects this overlay into a
 scaffolded `slave/` project with only safe appends:
@@ -38,6 +42,26 @@ scaffolded `slave/` project with only safe appends:
 
 It is idempotent and self-skips on ESP-Hosted < 2.8.1 (no CustomRpc channel).
 
+### ESP-Hosted 3.x
+
+On a 3.x co-processor project (`bluetooth/.../cp`) the CustomRpc channel is the
+`eh_cp_feat_peer_data` feature of the esp_hosted component itself, so this
+directory is a complete ESP-IDF component and `apply-overlay.sh` is not used.
+The workflow copies it verbatim to `components/esp_now_hosted/` in the
+scaffolded project, which ESP-IDF discovers on its own:
+
+```sh
+mkdir -p coprocessor/components
+cp -r slave-overlay coprocessor/components/esp_now_hosted
+```
+
+[`Kconfig`](Kconfig) selects `ESP_HOSTED_CP_FEAT_PEER_DATA` and
+[`CMakeLists.txt`](CMakeLists.txt) adds the force-link. Nothing in the
+scaffolded project is edited. `esp_now_hosted_slave.c` selects the 2.x or 3.x
+API at each call with `#ifdef CONFIG_ESP_HOSTED_CP`, a symbol only 3.x defines.
+Verified to build for the ESP32-C6 with ESP-Hosted 3.0.8 on 2026-09-25 (not yet
+exercised on hardware).
+
 ## Wire-protocol coupling (important)
 
 `esp_now_hosted_rpc.h` defines the exact bytes exchanged with the ESPHome host
@@ -51,7 +75,8 @@ identically.
 Re-verify on each ESP-Hosted bump (see the design notes for the specifics):
 
 - the CustomRpc callback signature (`esp_hosted_register_custom_callback` gained
-  a 4th `void *local_context` arg around v2.8);
+  a 4th `void *local_context` arg around v2.8; 3.x's
+  `eh_cp_feat_peer_data_register_callback` has the same shape);
 - the native `esp_now_send_cb_t` signature (changed to the `esp_now_send_info_t`
   form at IDF 5.5 — `esp_now_hosted_slave.c` version-guards it);
 - that host/slave ESP-Hosted versions stay matched.
