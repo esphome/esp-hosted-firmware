@@ -99,12 +99,23 @@ uses the release ESPHome recommends). The ESP-NOW overlay applies to 3.x too:
 `apply-overlay.sh` just copy it into the project's `components/` directory.
 
 ```sh
-idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.8:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
+idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.9:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
 mkdir -p coprocessor/components
 cp -r slave-overlay coprocessor/components/esp_now_hosted
 cd coprocessor/
 idf.py set-target esp32c6
 idf.py build
+```
+
+The 3.x CI builds also enable WPA2 Enterprise (EAP), which the stock
+co-processor example leaves out to save flash, so ESPHome's `wifi:` `eap:`
+option works through the co-processor. To match that in a custom build, add
+these to `sdkconfig.defaults` before building (replacing the example's
+`CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n` line):
+
+```
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=y
+CONFIG_ESP_HOSTED_CP_FEAT_WIFI_EXT_ENT=y
 ```
 
 After building, copy the firmware to your ESPHome configuration directory:
