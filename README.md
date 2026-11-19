@@ -23,6 +23,14 @@ Only targets supporting SDIO transport are built:
 | ESP32-C6 | Yes | Built |
 | ESP32-C61 | Yes | Built |
 
+### ESP32-C5 partition table
+
+ESP32-C5 co-processors that shipped with ESP-Hosted 2.x have their partition table at `0xc000`, not at the usual `0x8000`. An update through the host replaces only the firmware, and the firmware must be built for the offset of the table already on the chip. The ESP32-C5 images here are therefore built for `0xc000`, with the 2.x layout in [`partitions.esp32c5.csv`](partitions.esp32c5.csv).
+
+> **Do not install the ESP32-C5 images of 3.0.8, 3.0.9, 3.0.10 or 3.1.0 built before this change over a 2.x co-processor.** They were built for `0x8000` and leave the co-processor unable to start. Recovery needs the ESP32-C5's own serial port: erase the `otadata` partition (`esptool --chip esp32c5 erase-region 0x16000 0x2000`) and it boots the previous firmware again.
+
+A co-processor that was flashed over its serial port with a stock ESP-Hosted 3.x build has its table at `0x8000`. Do not install the ESP32-C5 images from here on it.
+
 ## Usage
 
 Pre-built firmware binaries and manifests are available at [esphome.github.io/esp-hosted-firmware](https://esphome.github.io/esp-hosted-firmware/).
