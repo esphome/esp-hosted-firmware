@@ -58,6 +58,18 @@ update:
     sha256: de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31
 ```
 
+### First-Time Flashing
+
+The `network_adapter_<target>.bin` files hold the firmware only. They update a co-processor that already runs ESP-Hosted, through the host, and do not boot when written to a blank chip.
+
+For a blank co-processor, use `network_adapter_<target>.factory.bin`. It also holds the bootloader and the partition table, and is written at offset `0x0` over the co-processor's own serial port, for example with [web.esphome.io](https://web.esphome.io) or esptool:
+
+```sh
+esptool --chip esp32c6 write-flash 0x0 network_adapter_esp32c6.factory.bin
+```
+
+Older releases have no factory image.
+
 ## Building Custom Firmware
 
 To build firmware locally, you'll need to set up the ESP-IDF environment. Use

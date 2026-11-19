@@ -127,12 +127,16 @@ jobs:
           . $IDF_PATH/export.sh
           idf.py set-target ${{ matrix.target }}
           idf.py build
+          # Bootloader, partition table and firmware in one image, for flashing
+          # a blank co-processor at offset 0x0
+          idf.py merge-bin -o network_adapter_${{ matrix.target }}.factory.bin
 
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
           cp ${{ steps.params.outputs.project }}/build/${{ steps.params.outputs.binary }} artifacts/network_adapter_${{ matrix.target }}.bin
           sha256sum artifacts/network_adapter_${{ matrix.target }}.bin > artifacts/network_adapter_${{ matrix.target }}.bin.sha256
+          cp ${{ steps.params.outputs.project }}/build/network_adapter_${{ matrix.target }}.factory.bin artifacts/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7.0.2
@@ -307,6 +311,7 @@ jobs:
           <body>
             <h1>ESP-Hosted Firmware</h1>
             <p>Pre-built ESP-Hosted firmware binaries for ESPHome.</p>
+            <p>Files ending in <code>.factory.bin</code> include the bootloader and partition table. Use them to flash a blank co-processor at offset 0x0. The other files are for updates through the host.</p>
 
             <div class="manifest-section">
               <h3>Manifests (JSON)</h3>
