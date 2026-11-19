@@ -58,6 +58,18 @@ update:
     sha256: de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31
 ```
 
+### First-Time Flashing
+
+The `network_adapter_<target>.bin` files hold the firmware only. They update a co-processor that already runs ESP-Hosted, through the host, and do not boot when written to a blank chip.
+
+For a blank co-processor, use `network_adapter_<target>.factory.bin`. It also holds the bootloader and the partition table, and is written at offset `0x0` over the co-processor's own serial port, for example with [web.esphome.io](https://web.esphome.io) or esptool:
+
+```sh
+esptool --chip esp32c6 write-flash 0x0 network_adapter_esp32c6.factory.bin
+```
+
+Older releases have no factory image.
+
 ## Building Custom Firmware
 
 To build firmware locally, you'll need to set up the ESP-IDF environment. Use
@@ -99,14 +111,32 @@ uses the release ESPHome recommends). The ESP-NOW overlay applies to 3.x too:
 `apply-overlay.sh` just copy it into the project's `components/` directory.
 
 ```sh
-idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.8:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
+idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.1.0:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
 mkdir -p coprocessor/components
 cp -r slave-overlay coprocessor/components/esp_now_hosted
 cd coprocessor/
 # The 3.x project sets no version; ESPHome compares it with the co-processor's
-echo 3.0.8 > version.txt
+echo 3.1.0 > version.txt
 idf.py set-target esp32c6
 idf.py build
+```
+
+The 3.x CI builds also enable WPA2 Enterprise (EAP), which the stock
+co-processor example leaves out to save flash. This is the co-processor half
+only: the host must also be built with
+`CONFIG_ESP_HOSTED_HOST_FEAT_WIFI_EXT_ENT=y`. ESPHome does not set that yet,
+so its `wifi:` `eap:` option does not work through the co-processor until it
+does.
+
+To match the CI builds in a custom build, add these to the project's
+`sdkconfig.defaults` before running `idf.py set-target`, replacing the
+example's `CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n` line. `set-target` writes
+`sdkconfig` from the defaults, so if it has already run, delete `sdkconfig`
+and run it again:
+
+```
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=y
+CONFIG_ESP_HOSTED_CP_FEAT_WIFI_EXT_ENT=y
 ```
 
 After building, copy the firmware to your ESPHome configuration directory:
