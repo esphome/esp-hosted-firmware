@@ -96,11 +96,28 @@ jobs:
             echo "overlay=script" >> "$GITHUB_OUTPUT"
           fi
           echo "project=coprocessor" >> "$GITHUB_OUTPUT"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
 
       - name: Create project from esp_hosted co-processor example
         run: |
           . $IDF_PATH/export.sh
           idf.py create-project-from-example --path "${{ steps.params.outputs.project }}" "espressif/esp_hosted==${{ env.ESP_HOSTED_VERSION }}:${{ steps.params.outputs.example }}"
+
+      # An ESP32-C5 that shipped with esp_hosted 2.x has its partition table at
+      # 0xc000. A host update only replaces the firmware, so the bootloader and
+      # table on the chip stay. The 3.x project builds for 0x8000, and that
+      # image cannot find its partitions there. Keep the 2.x offset and layout.
+      - name: Keep the 2.x partition table on the ESP32-C5 (esp_hosted 3.x)
+        if: matrix.target == 'esp32c5' && steps.params.outputs.major != '2'
+        run: |
+          cp partitions.esp32c5.csv "${{ steps.params.outputs.project }}/"
+          DEFAULTS="${{ steps.params.outputs.project }}/sdkconfig.defaults.esp32c5"
+          sed -i '/^CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=/d' "$DEFAULTS"
+          {
+            echo
+            echo 'CONFIG_PARTITION_TABLE_OFFSET=0xc000'
+            echo 'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.esp32c5.csv"'
+          } >> "$DEFAULTS"
 
       # The ESP-NOW-over-CustomRpc overlay (slave-overlay/) gives the firmware
       # ESP-NOW, which upstream esp-hosted does not yet proxy
@@ -130,6 +147,11 @@ jobs:
 
       - name: Prepare artifacts
         run: |
+          # An ESP32-C5 image built for another partition table offset does not
+          # boot on a co-processor that shipped with esp_hosted 2.x
+          if [ "${{ matrix.target }}" = "esp32c5" ]; then
+            grep -q '^0xc000 partition_table/' "${{ steps.params.outputs.project }}/build/flash_args"
+          fi
           mkdir -p artifacts
           cp ${{ steps.params.outputs.project }}/build/${{ steps.params.outputs.binary }} artifacts/network_adapter_${{ matrix.target }}.bin
           sha256sum artifacts/network_adapter_${{ matrix.target }}.bin > artifacts/network_adapter_${{ matrix.target }}.bin.sha256

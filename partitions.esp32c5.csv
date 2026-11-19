@@ -1,0 +1,14 @@
+# Partition table for the ESP32-C5, placed at 0xc000.
+# Same layout as the esp_hosted 2.x ESP32-C5 co-processor firmware, which is
+# what boards ship with. Do not change it: the bootloader and table already on
+# a chip stay when the host updates the firmware.
+# Name,           Type, SubType,  Offset,   Size,     Flags
+esp_secure_cert,  0x3F, ,         0xD000,   0x2000,   encrypted
+nvs_key,          data, nvs_keys, 0xF000,   0x1000,   encrypted
+nvs,              data, nvs,      0x10000,  0x6000,
+otadata,          data, ota,      ,         0x2000,
+phy_init,         data, phy,      ,         0x1000,
+ota_0,            app,  ota_0,    0x20000,  0x1E0000,
+ota_1,            app,  ota_1,    0x200000, 0x1E0000,
+reserved,         0x06, ,         0x3E0000, 0x1A000,
+fctry,            data, nvs,      0x3FA000, 0x6000,
