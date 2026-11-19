@@ -173,6 +173,19 @@ jobs:
           echo "Image version: $VERSION"
           [ "$VERSION" = "$ESP_HOSTED_VERSION" ]
 
+      # A host update replaces only the firmware, so the image has to fit the
+      # smallest update slot a co-processor of this type can have: 1536 KB on an
+      # ESP32-C6 or ESP32-C61 that shipped with esp_hosted 2.x, 1792 KB otherwise.
+      - name: Check the firmware fits the update slot
+        run: |
+          case "${{ matrix.target }}" in
+            esp32c6|esp32c61) LIMIT=1572864 ;;
+            *) LIMIT=1835008 ;;
+          esac
+          SIZE=$(stat -c %s artifacts/network_adapter_${{ matrix.target }}.bin)
+          echo "Image: $SIZE bytes, update slot: $LIMIT bytes, free: $((LIMIT - SIZE)) bytes"
+          [ "$SIZE" -le "$LIMIT" ]
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v7.0.2
         with:
