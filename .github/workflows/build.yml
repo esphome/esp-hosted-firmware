@@ -140,6 +140,15 @@ jobs:
       - name: Set the firmware version
         run: echo "$ESP_HOSTED_VERSION" > "${{ steps.params.outputs.project }}/version.txt"
 
+      # ESPHome builds for size as well. The project defaults build most targets
+      # for speed, which leaves too little room in the update slot of a
+      # co-processor that shipped with esp_hosted 2.x.
+      - name: Optimize for size
+        working-directory: ${{ steps.params.outputs.project }}
+        run: |
+          sed -i '/^CONFIG_COMPILER_OPTIMIZATION_\(PERF\|SIZE\|DEBUG\|NONE\)=/d' sdkconfig.defaults*
+          printf '\nCONFIG_COMPILER_OPTIMIZATION_SIZE=y\n' >> sdkconfig.defaults
+
       - name: Build firmware
         working-directory: ${{ steps.params.outputs.project }}
         run: |
