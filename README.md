@@ -99,7 +99,7 @@ uses the release ESPHome recommends). The ESP-NOW overlay applies to 3.x too:
 `apply-overlay.sh` just copy it into the project's `components/` directory.
 
 ```sh
-idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0.9:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
+idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.1.0:bluetooth/esp_hosted_nimble/bleprph_wifi_coex/cp"
 mkdir -p coprocessor/components
 cp -r slave-overlay coprocessor/components/esp_now_hosted
 cd coprocessor/
@@ -108,10 +108,17 @@ idf.py build
 ```
 
 The 3.x CI builds also enable WPA2 Enterprise (EAP), which the stock
-co-processor example leaves out to save flash, so ESPHome's `wifi:` `eap:`
-option works through the co-processor. To match that in a custom build, add
-these to `sdkconfig.defaults` before building (replacing the example's
-`CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n` line):
+co-processor example leaves out to save flash. This is the co-processor half
+only: the host must also be built with
+`CONFIG_ESP_HOSTED_HOST_FEAT_WIFI_EXT_ENT=y`. ESPHome does not set that yet,
+so its `wifi:` `eap:` option does not work through the co-processor until it
+does.
+
+To match the CI builds in a custom build, add these to the project's
+`sdkconfig.defaults` before running `idf.py set-target`, replacing the
+example's `CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n` line. `set-target` writes
+`sdkconfig` from the defaults, so if it has already run, delete `sdkconfig`
+and run it again:
 
 ```
 CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=y
