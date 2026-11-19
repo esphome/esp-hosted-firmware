@@ -103,6 +103,8 @@ idf.py create-project-from-example --path coprocessor "espressif/esp_hosted==3.0
 mkdir -p coprocessor/components
 cp -r slave-overlay coprocessor/components/esp_now_hosted
 cd coprocessor/
+# The 3.x project sets no version; ESPHome compares it with the co-processor's
+echo 3.0.8 > version.txt
 idf.py set-target esp32c6
 idf.py build
 ```

@@ -121,6 +121,12 @@ jobs:
           mkdir -p "${{ steps.params.outputs.project }}/components"
           cp -r slave-overlay "${{ steps.params.outputs.project }}/components/esp_now_hosted"
 
+      # The esp_hosted 3.x project sets no version, so ESP-IDF would build "1"
+      # into the image. ESPHome compares the image version with the version the
+      # co-processor reports, so the two have to match.
+      - name: Set the firmware version
+        run: echo "$ESP_HOSTED_VERSION" > "${{ steps.params.outputs.project }}/version.txt"
+
       - name: Build firmware
         working-directory: ${{ steps.params.outputs.project }}
         run: |
@@ -133,6 +139,13 @@ jobs:
           mkdir -p artifacts
           cp ${{ steps.params.outputs.project }}/build/${{ steps.params.outputs.binary }} artifacts/network_adapter_${{ matrix.target }}.bin
           sha256sum artifacts/network_adapter_${{ matrix.target }}.bin > artifacts/network_adapter_${{ matrix.target }}.bin.sha256
+
+      - name: Check the firmware version
+        run: |
+          # The version field of esp_app_desc_t is 0x30 bytes into the image
+          VERSION=$(dd if=artifacts/network_adapter_${{ matrix.target }}.bin bs=1 skip=48 count=32 2>/dev/null | tr -d '\0')
+          echo "Image version: $VERSION"
+          [ "$VERSION" = "$ESP_HOSTED_VERSION" ]
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7.0.1
