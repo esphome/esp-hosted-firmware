@@ -140,8 +140,40 @@ jobs:
           name: firmware-${{ matrix.target }}
           path: artifacts/
 
+  # The ESP32-H2 on the ESP Thread Border Router/Zigbee Gateway Board is an
+  # OpenThread radio co-processor, not an esp_hosted one: it runs ESP-IDF's
+  # examples/openthread/ot_rcp, built here with the same ESP-IDF as the rest
+  # and the board's host UART pins (see ot-rcp/).
+  ot-rcp:
+    needs: idf
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: espressif/idf:${{ needs.idf.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - esp32h2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Build OpenThread RCP firmware
+        run: |
+          . $IDF_PATH/export.sh
+          bash ./ot-rcp/build-ot-rcp.sh "${{ matrix.target }}" artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: firmware-ot-rcp-${{ matrix.target }}
+          path: artifacts/
+
   release:
-    needs: [idf, build]
+    needs: [idf, build, ot-rcp]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || inputs.release
     permissions:
@@ -175,11 +207,15 @@ jobs:
       cancel-in-progress: false
     strategy:
       matrix:
-        target:
-          - esp32
-          - esp32c5
-          - esp32c6
-          - esp32c61
+        # image: the release asset prefix the manifest points at
+        # (<image>_<target>.bin). For the ESP32-H2 RCP that is the
+        # esp_rcp_update image, which the host flashes onto the RCP.
+        include:
+          - { target: esp32, image: network_adapter }
+          - { target: esp32c5, image: network_adapter }
+          - { target: esp32c6, image: network_adapter }
+          - { target: esp32c61, image: network_adapter }
+          - { target: esp32h2, image: rcp_image }
 
     steps:
       - name: Generate manifest
@@ -187,6 +223,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TARGET="${{ matrix.target }}"
+          IMAGE="${{ matrix.image }}"
           REPO="${{ github.repository }}"
           REPO_OWNER=$(echo "$REPO" | cut -d'/' -f1)
           REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
@@ -205,7 +242,7 @@ jobs:
             fi
 
             VERSION="${TAG#v}"
-            SHA256_FILE="network_adapter_${TARGET}.bin.sha256"
+            SHA256_FILE="${IMAGE}_${TARGET}.bin.sha256"
 
             # Download SHA256 file using gh CLI (handles auth properly)
             if gh release download "$TAG" --repo "$REPO" --pattern "$SHA256_FILE" --clobber 2>/dev/null; then
@@ -213,7 +250,7 @@ jobs:
               rm -f "$SHA256_FILE"
 
               if [ -n "$SHA256" ] && [ ${#SHA256} -eq 64 ]; then
-                BIN_URL="${BASE_URL}/${TAG}/network_adapter_${TARGET}.bin"
+                BIN_URL="${BASE_URL}/${TAG}/${IMAGE}_${TARGET}.bin"
 
                 # Add to manifest using jq
                 jq --arg ver "$VERSION" --arg url "$BIN_URL" --arg sha "$SHA256" \

@@ -1,0 +1,10 @@
+# ESP Thread Border Router/Zigbee Gateway Board: ESP32-H2-MINI-1 RCP.
+# https://docs.espressif.com/projects/esp-thread-br/en/latest/hardware_platforms.html
+#
+# Host (ESP32-S3) GPIO18 TX -> ESP32-H2 GPIO23 (U0RXD)
+# Host (ESP32-S3) GPIO17 RX <- ESP32-H2 GPIO24 (U0TXD)
+# 460800 baud, UART0 (the ot_rcp example default). These are also the H2's
+# default UART0 pins, but pin them so a change upstream can't move them.
+CONFIG_OPENTHREAD_UART_PIN_MANUAL=y
+CONFIG_OPENTHREAD_UART_RX_PIN=23
+CONFIG_OPENTHREAD_UART_TX_PIN=24
